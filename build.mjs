@@ -7,3 +7,6 @@ if(crypto.createHash('sha256').update(html).digest('hex')!=='941e693bdd04f22f64d
 fs.mkdirSync('dist',{recursive:true});
 fs.writeFileSync('dist/index.html',html);
 console.log('Static viewer ready: '+html.length+' bytes');
+
+// Include the separate automotive viewer without changing the motorcycle entry.
+await import('./build-thermal.mjs');
