@@ -1,0 +1,1547 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="交互查看方形电芯的极柱密封圈、装配剖面及密封失效路径。">
+  <meta name="theme-color" content="#142435">
+  <title>电池芯密封圈 · 三维拆解</title>
+  <style>
+:root {
+  color-scheme: light;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --navy: #142435;
+  --ink: #172c42;
+  --muted: #586b80;
+  --line: #d8e3ed;
+  --blue: #185ab9;
+  --pale: #edf5ff;
+  --amber: #a3500a;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: #f5f8fc; }
+button, input { font: inherit; }
+button { cursor: pointer; color: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible, summary:focus-visible {
+  outline: 2px solid #237bd9; outline-offset: 3px;
+}
+[hidden] { display: none !important; }
+.top { background: var(--navy); color: #f2f7ff; }
+.top-inner, main { width: min(1432px, calc(100% - 80px)); margin: 0 auto; }
+.top-inner { height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wordmark, .share { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.wordmark { font-weight: 650; letter-spacing: .06em; white-space: nowrap; }
+.mark { width: 31px; height: 31px; border: 1px solid #547ca4; border-radius: 9px; display: grid; place-items: center; background: #203a53; }
+.mark i { width: 18px; height: 13px; border: 2px solid #8ec5ff; border-radius: 50%; transform: rotate(-26deg); box-shadow: 0 2px 0 #538ed0; }
+.share { background: #223a51; border: 1px solid #496078; border-radius: 7px; padding: 7px 11px; font-size: 13px; }
+.share:hover { background: #2d4c68; }
+.share svg, .camera svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+.intro { padding: 36px 0 26px; }
+.intro h1 { font-size: clamp(32px, 3.3vw, 53px); line-height: 1.14; font-weight: 750; letter-spacing: -.045em; margin: 0 0 10px; }
+.intro p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--muted); }
+.workbench { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 16px; align-items: stretch; }
+.viewer, .sidebar { background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 5px 15px #1a365807; min-width: 0; }
+.viewer { display: flex; flex-direction: column; overflow: hidden; }
+.tabs { display: flex; flex-wrap: wrap; padding: 9px; gap: 4px; background: #fff; border-bottom: 1px solid var(--line); }
+.tabs button { border: 1px solid transparent; border-radius: 7px; background: transparent; padding: 8px 10px; font-size: 13px; line-height: 1.35; white-space: nowrap; color: #475e77; display: flex; align-items: center; gap: 6px; }
+.tabs button:hover { background: #f1f6fb; }
+.tabs button[aria-pressed="true"] { background: #e9f2ff; border-color: #c6ddfa; font-weight: 700; color: #1354aa; }
+.tabs button i { border-radius: 50%; width: 6px; height: 6px; background: #93aac2; }
+.tabs button[aria-pressed="true"] i { background: #226ac5; }
+.tabs button[data-mode="leak"] i { background: #d19554; }
+.stage {
+  position: relative; flex: 1; height: clamp(405px, 50vw, 620px); min-height: 405px; isolation: isolate;
+  background-color: #edf4fa;
+  background-image: linear-gradient(#a2c2db29 1px, transparent 1px), linear-gradient(90deg, #a2c2db29 1px, transparent 1px), radial-gradient(ellipse at 51% 31%, #fcfdff 1%, #eef5fb 54%, #dce9f5 100%);
+  background-size: 30px 30px, 30px 30px, 100% 100%;
+}
+.stage canvas { position: absolute; width: 100%; height: 100%; inset: 0; display: block; cursor: grab; touch-action: none; }
+.stage canvas:active { cursor: grabbing; }
+.stage-title { position: absolute; z-index: 2; top: 15px; left: 16px; display: grid; gap: 4px; pointer-events: none; }
+.stage-title strong { font-size: 13px; letter-spacing: .02em; color: #223b56; }
+.stage-key { position: absolute; bottom: 18px; left: 16px; border-radius: 5px; background: #fff6e6; padding: 5px 8px; color: #8a430d; font-size: 11px; font-weight: 650; pointer-events: none; }
+.stage-key span { display: inline-block; background: #d37a1a; border-radius: 50%; width: 7px; height: 7px; margin-right: 4px; }
+#annotations { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; }
+.annotation {
+  --a-color: #52779f; --leader: 24px;
+  position: absolute; display: flex; align-items: center; font-size: 11px; font-weight: 680; line-height: 1;
+  transform: translate(var(--leader), -50%); white-space: nowrap; border-radius: 5px; padding: 6px 7px;
+  color: #2a4867; border: 1px solid #b9cde2; background: #fafdfff6; pointer-events: auto;
+}
+.annotation::before { content: ""; position: absolute; right: 100%; width: var(--leader); height: 1px; background: var(--a-color); }
+.annotation::after { content: ""; position: absolute; right: calc(100% + var(--leader) - 3px); width: 6px; height: 6px; border-radius: 50%; background: var(--a-color); border: 1px solid #fff; }
+.annotation.left { transform: translate(calc(-100% - var(--leader)), -50%); }
+.annotation.left::before { right: auto; left: 100%; }
+.annotation.left::after { right: auto; left: calc(100% + var(--leader) - 3px); }
+.annotation[data-part="seal"] { --a-color: #287be4; background: #edf5ff; border-color: #93bbeb; color: #164d98; }
+.annotation.static-label { pointer-events: none; }
+.annotation[data-part="gap"], .annotation[data-part="leak"], .annotation[data-part="residue"], .annotation[data-part="interior"] {
+  --a-color: #b76e27; color: #864208; background: #fff7e9; border-color: #d9a365;
+}
+.annotation:hover, .annotation[aria-pressed="true"] { box-shadow: 0 0 0 2px #85b9f350; color: #134da4; }
+.camera { position: absolute; z-index: 2; right: 14px; bottom: 14px; display: flex; gap: 3px; background: #fbfdfff2; border: 1px solid #bfcfe0; border-radius: 8px; padding: 3px; box-shadow: 0 2px 12px #42698d12; }
+.camera button { display: grid; place-items: center; width: 35px; height: 35px; border: 0; background: transparent; border-radius: 5px; font-size: 22px; line-height: 1; color: #274b73; padding: 0; }
+.camera button:hover, .camera button[aria-pressed="true"] { background: #dfedfd; }
+.no-scene { position: absolute; inset: 40% 10% auto; padding: 15px; background: #fff; border-radius: 7px; text-align: center; font-size: 14px; }
+.viewer-footer { min-height: 55px; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); background: #fff; }
+.explode-control, .leak-control { display: flex; align-items: center; gap: 12px; font-size: 13px; white-space: nowrap; }
+.explode-control label { font-weight: 650; }
+.explode-control input { width: clamp(75px, 16vw, 240px); accent-color: #226ac5; cursor: pointer; margin: 0; }
+.explode-control output { color: var(--blue); min-width: 36px; font: 12px "IBM Plex Mono", ui-monospace, monospace; }
+.gestures { margin: 0 0 0 auto; display: flex; gap: 13px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.play { border: 1px solid #e0b685; border-radius: 6px; color: #824505; background: #fff5e7; padding: 6px 9px; }
+.step-control { width: 29px; height: 29px; border: 1px solid #e3c6a2; border-radius: 5px; background: #fff; color: #824505; font-size: 19px; line-height: 1; }
+.step-control:disabled { opacity: .35; cursor: default; }
+.step-control:not(:disabled):hover { background: #fff5e7; }
+#leak-progress { color: #764312; font-size: 12px; }
+.sidebar { padding: 20px 17px 17px; }
+.sidebar h2 { margin: 0 0 8px; font-size: 21px; line-height: 1.3; }
+.panel-text, .detail p { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 0; }
+#panel-body { margin-top: 17px; }
+.panel-heading { display: block; margin: 0 0 8px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.part-list { display: grid; gap: 7px; }
+.part, .leak-step {
+  text-align: left; width: 100%; background: #fff; border: 1px solid #dde6ef; border-radius: 8px; min-height: 51px;
+  padding: 8px 9px; display: grid; grid-template-columns: 23px minmax(0, 1fr) auto; gap: 9px; align-items: center;
+}
+.part:hover { border-color: #a9c9ec; background: #f5f9ff; }
+.part[aria-pressed="true"] { border-color: #9bc4f5; background: #edf5ff; }
+.swatch { width: 21px; height: 21px; border-radius: 50%; background: var(--part-color, #647b95); border: 1px solid #20365320; display: grid; place-items: center; }
+.swatch::after { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 1px solid #fff8; }
+.part[data-part="seal"] .swatch::after { width: 11px; height: 9px; border: 2px solid #b4c5d9; transform: rotate(-20deg); }
+.part strong, .leak-step strong { display: block; font-size: 13px; line-height: 1.3; }
+.part small { display: block; color: #5c7086; font-size: 11px; line-height: 1.35; margin-top: 3px; }
+.part-arrow { color: #4678b4; font-size: 18px; }
+.detail { margin-top: 17px; padding: 12px; border: 1px solid #d2e3f7; border-radius: 8px; background: #f1f7ff; }
+.detail strong { display: block; font-size: 14px; color: #224d82; margin-bottom: 5px; }
+.detail button { margin-top: 9px; border: 0; background: none; padding: 1px 0; font-size: 12px; font-weight: 700; color: #1a61bb; }
+.detail button:hover { text-decoration: underline; }
+.detail.failure { border-color: #e9cea8; background: #fff8ec; }
+.detail.failure strong { color: #854907; }
+.leak-step { grid-template-columns: 25px 1fr; }
+.leak-step span { display: grid; place-items: center; width: 24px; height: 24px; background: #f0f4fa; color: #4f6680; border-radius: 50%; font: 11px "IBM Plex Mono", ui-monospace, monospace; }
+.leak-step:hover, .leak-step[aria-pressed="true"] { border-color: #e3b878; background: #fff7e9; }
+.leak-step[aria-pressed="true"] span { background: #f7dfb9; color: #83460a; }
+.explainer { display: grid; grid-template-columns: 1fr 1fr; gap: 17px 34px; padding: 24px 0 18px; }
+.explainer h2 { font-size: 15px; margin: 0 0 6px; }
+.explainer p, .source { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0; }
+.source { border-top: 1px solid var(--line); padding: 12px 0 24px; }
+.source summary { cursor: pointer; width: fit-content; font-weight: 650; }
+.source a { color: #1a61bb; }
+.source ul { padding-left: 21px; }
+.toast { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); bottom: 18px; background: #1b3149; color: #fff; border-radius: 7px; padding: 10px 15px; font-size: 13px; white-space: nowrap; }
+@media (max-width: 1150px) {
+  .top-inner, main { width: calc(100% - 40px); }
+  .workbench { grid-template-columns: minmax(0, 1fr) 287px; gap: 12px; }
+}
+@media (max-width: 890px) {
+  .workbench { grid-template-columns: 1fr; }
+  .sidebar { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 15px 20px; }
+  .detail, #panel-body { margin: 0; }
+  #panel-body { grid-column: 2; grid-row: 1 / span 2; }
+  .stage { height: clamp(390px, 68vw, 560px); }
+}
+@media (max-width: 600px) {
+  .top-inner, main { width: calc(100% - 24px); }
+  .top-inner { height: 51px; }
+  .intro { padding: 22px 0 17px; }
+  .intro p { font-size: 13px; }
+  .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 6px; }
+  .tabs button { font-size: 12px; justify-content: center; padding: 7px 3px; }
+  .stage { height: clamp(335px, 86vw, 430px); min-height: 335px; }
+  .stage-title { top: 9px; left: 10px; }
+  .stage-title strong { font-size: 11px; }
+  .annotation { --leader: 9px; font-size: 10px; padding: 4px; }
+  .viewer-footer { min-height: 51px; padding: 7px 8px; }
+  .explode-control { gap: 6px; font-size: 12px; }
+  .gestures { font-size: 10px; gap: 6px; }
+  .leak-control { gap: 5px; font-size: 11px; }
+  .leak-control:not([hidden]) + .gestures { display: none; }
+  #leak-progress { font-size: 11px; }
+  .camera { right: 8px; bottom: 8px; }
+  .camera button { width: 30px; height: 30px; }
+  .sidebar { display: block; padding: 15px; }
+  #panel-body, .detail { margin-top: 12px; }
+  .explainer { grid-template-columns: 1fr; padding-top: 18px; }
+}
+@media (pointer: coarse) {
+  #gestures span:last-child { display: none; }
+}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="wordmark">
+        <span class="mark" aria-hidden="true"><i></i></span>
+        <span>电芯结构图解</span>
+      </div>
+      <button class="share" id="share" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.7a3 3 0 0 0 4.3 0l4-4a3 3 0 0 0-4.3-4.3l-2.1 2.1m2.1 2.8a3 3 0 0 0-4.3 0l-4 4a3 3 0 0 0 4.3 4.3l2.1-2.1"/></svg>
+        复制链接
+      </button>
+    </div>
+  </header>
+  <main>
+    <div class="intro">
+      <h1>电池芯密封圈</h1>
+      <p>拆开方形电芯的极柱总成，查看黑色密封圈的装配位置和失效后的渗漏路径。</p>
+    </div>
+    <div class="workbench">
+      <section class="viewer" aria-label="三维模型">
+        <nav class="tabs" aria-label="模型视图">
+          <button type="button" data-mode="cell" aria-pressed="false"><i aria-hidden="true"></i>整颗电芯</button>
+          <button type="button" data-mode="assembled" aria-pressed="false"><i aria-hidden="true"></i>装配位置</button>
+          <button type="button" data-mode="exploded" aria-pressed="true"><i aria-hidden="true"></i>爆炸拆解</button>
+          <button type="button" data-mode="section" aria-pressed="false"><i aria-hidden="true"></i>密封剖面</button>
+          <button type="button" data-mode="seal" aria-pressed="false"><i aria-hidden="true"></i>单看密封圈</button>
+          <button type="button" data-mode="leak" aria-pressed="false"><i aria-hidden="true"></i>泄漏演示</button>
+        </nav>
+        <div class="stage" id="stage">
+          <div class="stage-title"><strong id="scene-title">极柱总成爆炸图</strong></div>
+          <canvas id="scene" tabindex="0" aria-label="交互式三维电芯。拖动或按方向键旋转，滚轮或加减键缩放。"></canvas>
+          <div id="annotations" aria-label="模型标注"></div>
+          <div class="stage-key" id="stage-key" hidden><span></span>电解液示踪</div>
+          <div class="camera" aria-label="镜头控制">
+            <button type="button" id="zoom-in" title="放大" aria-label="放大">+</button>
+            <button type="button" id="zoom-out" title="缩小" aria-label="缩小">−</button>
+            <button type="button" id="reset" title="复位视角" aria-label="复位视角"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10A8 8 0 1 1 6 17M4.5 4v6h6"/></svg></button>
+            <button type="button" id="rotate" title="自动旋转" aria-label="自动旋转" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8c1-3 3-5 6-5 4 0 7 4 7 9s-3 9-7 9c-3 0-5-2-6-5M2 11c0 2 4 4 10 4s10-2 10-4c0-1-1-2-3-3M2 7v4h4"/></svg></button>
+          </div>
+          <div id="no-scene" class="no-scene" hidden>浏览器未能初始化三维视图。请尝试用近期版本的 Chrome、Edge 或 Safari 打开。</div>
+          <noscript><div class="no-scene">启用 JavaScript 后即可操作三维模型。</div></noscript>
+        </div>
+        <div class="viewer-footer">
+          <div class="explode-control" id="explode-control">
+            <label for="explode">拆解距离</label>
+            <input id="explode" type="range" min="0" max="100" value="74" aria-label="拆解距离">
+            <output id="explode-value" for="explode">74%</output>
+          </div>
+          <div class="leak-control" id="leak-control" hidden>
+            <button class="play" id="play-leak" type="button">▶ 播放过程</button>
+            <button type="button" class="step-control" id="prev-phase" aria-label="上一个泄漏步骤">‹</button>
+            <span id="leak-progress" aria-live="polite"></span>
+            <button type="button" class="step-control" id="next-phase" aria-label="下一个泄漏步骤">›</button>
+          </div>
+          <p class="gestures" id="gestures"><span>拖动旋转</span><span>滚轮缩放</span></p>
+        </div>
+      </section>
+      <aside class="sidebar" aria-labelledby="panel-title">
+        <div class="panel-main">
+          <h2 id="panel-title">极柱总成</h2>
+          <p class="panel-text" id="panel-text">沿极柱轴向拉开零件，查看密封圈、极柱与顶盖沉孔的相对位置。</p>
+        </div>
+        <div id="panel-body"></div>
+        <div class="detail" id="detail" aria-live="polite"></div>
+      </aside>
+    </div>
+    <section class="explainer" aria-labelledby="explain-title">
+      <div>
+        <h2 id="explain-title">密封圈在电池里做什么</h2>
+        <p>电池包由多颗电芯组成，也可先组合成模组。黑色密封圈在单颗电芯的顶盖上，围绕穿过盖板的极柱。装配压紧后，它帮助封住极柱孔周围的间隙。</p>
+      </div>
+      <div>
+        <h2>“漏油”在这里指什么</h2>
+        <p>演示以液态锂离子电芯为例，用琥珀色标出液态电解液可能经过的路径。样件实际液体来源、内部结构和失效表现需结合客户资料及检测确认。</p>
+      </div>
+    </section>
+    <footer class="source">
+      <details>
+        <summary>模型依据与参考资料</summary>
+        <p>黑色密封圈的宽法兰、上凸缘和通孔参考来图。法兰外径按示意比例重建。极柱、盖板、壳体和内部零件采用通用结构示意。剖面中的间隙和动画时序经过放大与简化，供送样阶段沟通。</p>
+        <ul>
+          <li><a href="https://data.epo.org/publication-server/rest/v1.2/publication-dates/2025-10-22/patents/EP4636914NWA2/document.pdf" target="_blank" rel="noopener noreferrer">极柱密封界面示例 · 欧洲专利局</a></li>
+          <li><a href="https://advanced.onlinelibrary.wiley.com/doi/10.1002/advs.202405897" target="_blank" rel="noopener noreferrer">电解液用量对电芯老化的影响 · Advanced Science</a></li>
+          <li><a href="https://www.nhtsa.gov/sites/nhtsa.gov/files/documents/12848-lithiumionsafetyhybrids_101217-v3-tag.pdf" target="_blank" rel="noopener noreferrer">电动车用锂离子电池安全 · NHTSA</a></li>
+        </ul>
+      </details>
+    </footer>
+  </main>
+  <div class="toast" id="toast" role="status" hidden></div>
+<script>
+(() => {
+  "use strict";
+
+  const TAU = 2 * Math.PI;
+  const ANGLE_STEPS = 72;
+  const SURFACE = {
+    aluminum: palette("#aebbc6", .66, .10),
+    body: palette("#aabac7", .62, .09),
+    rim: palette("#d1dae2", .67, .12),
+    steel: palette("#b8c7d6", .82, .15),
+    steelDark: palette("#8297aa", .74, .06),
+    black: palette("#252a30", .10, .05),
+    blackEdge: palette("#363e47", .15, .07),
+    insulator: palette("#3d5972", .16, .04),
+    opening: palette("#425468", .14, .03),
+    cutAluminum: palette("#d8c9b4", .2, .03),
+    cutSteel: palette("#d3dae5", .35, .05),
+    cutBlack: palette("#424957", .1, .03),
+    cutInsulator: palette("#7a8fa7", .12, .01),
+    copper: palette("#ad7b53", .33, .03),
+    sheet: palette("#87998d", .12, .01),
+    separator: palette("#d7d8bd", .08, .01),
+    guide: palette("#80a9db", 0, 0, .25),
+    guidesDark: palette("#3483e5", 0, 0, .63),
+    contact: palette("#2783ea", 0, 0, .5),
+    warning: palette("#ff7d29", .25, .28, .2),
+    fluid: palette("#fb8a2f", .58, .18, .13),
+    fluidLight: palette("#ffaf4e", .43, .14, .25),
+    residue: palette("#99521f", .29, .11),
+    inside: palette("#5b7082", .44, .05),
+    dryRegion: palette("#665043", .02, .0),
+  };
+
+  function palette(hex, metal, shine, emission = 0) {
+    const rgb = hex.match(/[0-9a-f]{2}/gi).map((n) => parseInt(n, 16) / 255);
+    return { rgb, metal, shine, emission };
+  }
+
+  // Unitless proportions for the illustrative mesh.
+  const ring = {
+    bore: 1.36,
+    collar: 1.54,
+    flange: 2.14,
+    height: .69,
+    flangeHeight: .30,
+    fillet: .055,
+  };
+
+  function profileWithFillets(vertices, radius) {
+    return vertices.flatMap((point, index) => {
+      const before = vertices[(index + vertices.length - 1) % vertices.length];
+      const after = vertices[(index + 1) % vertices.length];
+      const trim = (other) => {
+        const dx = other[0] - point[0];
+        const dy = other[1] - point[1];
+        const fraction = Math.min(radius / Math.hypot(dx, dy), .28);
+        return [point[0] + dx * fraction, point[1] + dy * fraction];
+      };
+      const start = trim(before);
+      const end = trim(after);
+      return [0, .33, .67, 1].map((t) => {
+        const a = (1 - t) * (1 - t);
+        const b = 2 * (1 - t) * t;
+        const c = t * t;
+        return [a * start[0] + b * point[0] + c * end[0], a * start[1] + b * point[1] + c * end[1]];
+      });
+    });
+  }
+
+  const sealProfile = profileWithFillets([
+    [ring.bore, 0], [ring.flange, 0], [ring.flange, ring.flangeHeight],
+    [ring.collar, ring.flangeHeight], [ring.collar, ring.height], [ring.bore, ring.height],
+  ], ring.fillet);
+  function openSealGap([radius, y]) {
+    const spread = .125 * Math.max(0, 1 - (radius - ring.bore) / .16);
+    return [radius + spread, y];
+  }
+
+  const postProfile = [
+    [0, -1.3], [1.21, -1.3], [1.32, -1.21], [1.36, -1.11], [1.36, .39],
+    [1.40, .45], [1.69, .45], [1.81, .53], [1.83, .65], [1.83, .89],
+    [1.79, .99], [1.70, 1.06], [.97, 1.06], [.89, 1.13], [.87, 1.95],
+    [.79, 2.04], [.48, 2.04], [.43, 2.00], [.43, 1.61], [0, 1.61],
+  ];
+  const insertProfile = [
+    [1.37, -.91], [1.69, -.91], [1.83, -.85], [1.85, -.65], [1.80, -.59], [1.37, -.59],
+  ];
+
+  function vertex(buffer, point, normal) {
+    buffer.push(...point, ...normal);
+  }
+
+  function triangle(buffer, a, b, c, normal) {
+    vertex(buffer, a, normal);
+    vertex(buffer, b, normal);
+    vertex(buffer, c, normal);
+  }
+
+  function quad(buffer, a, b, c, d, normal) {
+    triangle(buffer, a, b, c, normal);
+    triangle(buffer, a, c, d, normal);
+  }
+
+  function loopSegments(callback, section, count = ANGLE_STEPS) {
+    const start = section ? Math.PI : 0;
+    const limit = section ? count / 2 : count;
+    for (let index = 0; index < limit; index++) {
+      callback(start + index * TAU / count, start + (index + 1) * TAU / count);
+    }
+  }
+
+  function revolve(profile, section, count) {
+    const buffer = [];
+    for (let index = 0; index < profile.length; index++) {
+      const [r0, y0] = profile[index];
+      const [r1, y1] = profile[(index + 1) % profile.length];
+      const length = Math.hypot(r1 - r0, y1 - y0);
+      if (!length || (!r0 && !r1)) continue;
+      const radial = (y1 - y0) / length;
+      const vertical = (r0 - r1) / length;
+      loopSegments((a, b) => {
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        const cb = Math.cos(b);
+        const sb = Math.sin(b);
+        const p = [r0 * ca, y0, r0 * sa];
+        const q = [r0 * cb, y0, r0 * sb];
+        const r = [r1 * cb, y1, r1 * sb];
+        const s = [r1 * ca, y1, r1 * sa];
+        const n = [radial * ca, vertical, radial * sa];
+        const m = [radial * cb, vertical, radial * sb];
+        vertex(buffer, p, n); vertex(buffer, q, m); vertex(buffer, r, m);
+        vertex(buffer, p, n); vertex(buffer, r, m); vertex(buffer, s, n);
+      }, section, count);
+    }
+    return buffer;
+  }
+
+  function cross2(a, b, c) {
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  }
+
+  function cutFaces(profile, bilateral = true) {
+    const faces = [];
+    const points = profile.slice();
+    while (points.length > 2) {
+      const ear = points.findIndex((b, index) => {
+        const a = points[(index + points.length - 1) % points.length];
+        const c = points[(index + 1) % points.length];
+        return cross2(a, b, c) > 1e-8 && !points.some((p) => (
+          p !== a && p !== b && p !== c &&
+          cross2(a, b, p) > 1e-8 && cross2(b, c, p) > 1e-8 && cross2(c, a, p) > 1e-8
+        ));
+      });
+      if (ear < 0) break;
+      const corner = points[ear];
+      const before = points[(ear + points.length - 1) % points.length];
+      const after = points[(ear + 1) % points.length];
+      const face = [before, corner, after];
+      for (const sign of bilateral ? [1, -1] : [1]) {
+        triangle(faces, ...face.map(([r, y]) => [r * sign, y, 0]), [0, 0, 1]);
+      }
+      points.splice(ear, 1);
+    }
+    return faces;
+  }
+
+  function box(width, height, depth) {
+    const x = width / 2;
+    const y = height / 2;
+    const z = depth / 2;
+    const buffer = [];
+    quad(buffer, [-x, y, -z], [x, y, -z], [x, y, z], [-x, y, z], [0, 1, 0]);
+    quad(buffer, [-x, -y, -z], [-x, -y, z], [x, -y, z], [x, -y, -z], [0, -1, 0]);
+    quad(buffer, [-x, -y, z], [-x, y, z], [x, y, z], [x, -y, z], [0, 0, 1]);
+    quad(buffer, [x, -y, -z], [x, y, -z], [-x, y, -z], [-x, -y, -z], [0, 0, -1]);
+    quad(buffer, [x, -y, z], [x, y, z], [x, y, -z], [x, -y, -z], [1, 0, 0]);
+    quad(buffer, [-x, -y, -z], [-x, y, -z], [-x, y, z], [-x, -y, z], [-1, 0, 0]);
+    return buffer;
+  }
+
+  function roundedBoundary(angle, w, d, radius) {
+    const cx = Math.cos(angle);
+    const cz = Math.sin(angle);
+    const ax = Math.abs(cx);
+    const az = Math.abs(cz);
+    let distance = Math.min(w / ax, d / az);
+    const x = w - radius;
+    const z = d - radius;
+    if (distance * ax > x && distance * az > z) {
+      const projection = x * ax + z * az;
+      distance = projection + Math.sqrt(Math.max(0, projection * projection - x * x - z * z + radius * radius));
+    }
+    return [cx * distance, cz * distance];
+  }
+
+  function plate(w, d, upper, lower, radius, section = false, holeUpper = 0, holeLower = 0) {
+    const faces = [];
+    const bevel = radius * .31;
+    const upperInset = Math.min(.06, (upper - lower) / 3);
+    loopSegments((a, b) => {
+      const outerA = roundedBoundary(a, w, d, radius);
+      const outerB = roundedBoundary(b, w, d, radius);
+      const rad = (angle, size, y) => [Math.cos(angle) * size, y, Math.sin(angle) * size];
+      const p = (pair, y, shrink = 0) => [pair[0] * (1 - shrink / w), y, pair[1] * (1 - shrink / d)];
+      quad(faces, rad(a, holeUpper, upper), p(outerA, upper, bevel), p(outerB, upper, bevel), rad(b, holeUpper, upper), [0, 1, 0]);
+      quad(faces, rad(a, holeLower, lower), p(outerA, lower, bevel), p(outerB, lower, bevel), rad(b, holeLower, lower), [0, -1, 0]);
+      const dx = outerB[0] - outerA[0];
+      const dz = outerB[1] - outerA[1];
+      const length = Math.hypot(dx, dz);
+      const nx = dz / length;
+      const nz = -dx / length;
+      quad(faces, p(outerA, lower + upperInset), p(outerB, lower + upperInset), p(outerB, upper - upperInset), p(outerA, upper - upperInset), [nx, 0, nz]);
+      quad(faces, p(outerA, upper - upperInset), p(outerB, upper - upperInset), p(outerB, upper, bevel), p(outerA, upper, bevel), [nx * .62, .78, nz * .62]);
+      quad(faces, p(outerA, lower + upperInset), p(outerB, lower + upperInset), p(outerB, lower, bevel), p(outerA, lower, bevel), [nx * .62, -.78, nz * .62]);
+    }, section, 144);
+    return faces;
+  }
+
+  function sleeve(w, d, top, bottom, corner) {
+    const faces = [];
+    const wall = .18;
+    loopSegments((a, b) => {
+      const outerA = roundedBoundary(a, w, d, corner);
+      const outerB = roundedBoundary(b, w, d, corner);
+      const innerA = roundedBoundary(a, w - wall, d - wall, corner - wall / 2);
+      const innerB = roundedBoundary(b, w - wall, d - wall, corner - wall / 2);
+      const p = (pair, y) => [pair[0], y, pair[1]];
+      const dx = outerB[0] - outerA[0];
+      const dz = outerB[1] - outerA[1];
+      const length = Math.hypot(dx, dz);
+      const nx = dz / length;
+      const nz = -dx / length;
+      quad(faces, p(innerA, top), p(outerA, top), p(outerB, top), p(innerB, top), [0, 1, 0]);
+      quad(faces, p(outerA, bottom), p(outerB, bottom), p(outerB, top), p(outerA, top), [nx, 0, nz]);
+      quad(faces, p(innerA, bottom), p(innerB, bottom), p(innerB, top), p(innerA, top), [-nx, 0, -nz]);
+    }, false, 144);
+    return faces;
+  }
+
+  function cylinder(r, bottom, top, bevel = .05) {
+    return [[0, bottom], [r - bevel, bottom], [r, bottom + bevel], [r, top - bevel], [r - bevel, top], [0, top]];
+  }
+
+  function strokeBetween(buffer, start, end, thickness) {
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    const length = Math.hypot(dx, dy) || 1;
+    const nx = -dy * thickness / length;
+    const ny = dx * thickness / length;
+    const p = (v, sign) => [v[0] + sign * nx, v[1] + sign * ny, v[2]];
+    quad(buffer, p(start, 1), p(start, -1), p(end, -1), p(end, 1), [0, 0, 1]);
+  }
+
+  function makeDashedCircle(radius, y, thickness, count = 64) {
+    const faces = [];
+    for (let index = 0; index < count; index += 2) {
+      const a = index / count * TAU;
+      const b = (index + 1.1) / count * TAU;
+      const p = (t, r) => [r * Math.cos(t), y, r * Math.sin(t)];
+      quad(faces, p(a, radius), p(a, radius + thickness), p(b, radius + thickness), p(b, radius), [0, 1, 0]);
+    }
+    return faces;
+  }
+
+  const meshData = {};
+  const saveMesh = (name, data) => { meshData[name] = new Float32Array(data); };
+  for (const [name, profile] of [["seal", sealProfile], ["post", postProfile], ["insert", insertProfile]]) {
+    saveMesh(name, revolve(profile, false));
+    saveMesh(name + "Section", revolve(profile, true));
+    saveMesh(name + "Cut", cutFaces(profile, false));
+  }
+  const sealGapSection = revolve(sealProfile, true);
+  for (let index = 0; index < sealGapSection.length; index += 6) {
+    const x = sealGapSection[index];
+    const y = sealGapSection[index + 1];
+    const z = sealGapSection[index + 2];
+    const radius = Math.hypot(x, z);
+    const [expanded] = openSealGap([radius, y]);
+    const local = 1 + ((expanded - radius) / radius) * Math.max(0, x / radius) ** 14;
+    sealGapSection[index] *= local;
+    sealGapSection[index + 2] *= local;
+  }
+  saveMesh("sealGapSection", sealGapSection);
+  saveMesh("sealGapCut", cutFaces(sealProfile.map(openSealGap), false));
+
+  saveMesh("detailLid", plate(5.25, 3.7, 0, -.59, .30, false, 2.21, 1.45));
+  saveMesh("detailLidSection", plate(5.25, 3.7, 0, -.59, .30, true, 2.21, 1.45));
+  const lidBore = [[1.45, -.59], [2.21, -.59], [2.21, 0], [2.14, -.055], [2.14, -.285], [1.49, -.285], [1.45, -.32]];
+  saveMesh("bore", revolve(lidBore, false));
+  saveMesh("boreSection", revolve(lidBore, true));
+  saveMesh("lidCut", cutFaces([
+    [1.45, -.59], [5.25, -.59], [5.25, 0], [2.21, 0],
+    [2.14, -.055], [2.14, -.285], [1.49, -.285], [1.45, -.32],
+  ]));
+  saveMesh("shell", plate(5.24, 3.68, -.64, -3.30, .31));
+  saveMesh("shellSkirt", sleeve(5.24, 3.68, -.64, -1.60, .31));
+  saveMesh("shellFloor", plate(5.24, 3.68, -1.56, -1.71, .31));
+  saveMesh("fullBody", plate(13.5, 4.0, -.69, -9.6, .42));
+  saveMesh("fullLid", plate(13.52, 4.02, 0, -.61, .36));
+  saveMesh("fullShoulder", revolve(cylinder(1.79, 0, .17, .07), false, 56));
+  saveMesh("fullTerminal", revolve(cylinder(1.5, .16, .55, .14), false, 56));
+  saveMesh("fullTerminalInset", revolve(cylinder(1.28, .53, .57, .02), false, 56));
+  saveMesh("fillPort", revolve(cylinder(.56, .008, .08, .035), false, 36));
+  saveMesh("fillPortInset", revolve(cylinder(.34, .08, .105, .012), false, 36));
+  saveMesh("assemblyDot", revolve(cylinder(.12, .003, .041, .015), false, 20));
+  saveMesh("vent", plate(1.52, .84, .083, .015, .61, false));
+  saveMesh("ventInset", plate(1.21, .65, .101, .080, .55, false));
+  saveMesh("ventLine", box(1.75, .026, .045));
+  saveMesh("horizontalSign", box(.87, .025, .116));
+  saveMesh("verticalSign", box(.116, .025, .87));
+  saveMesh("wall", box(.21, 3.65, 3.58));
+  saveMesh("rear", box(10.2, 3.65, .20));
+  saveMesh("bottom", box(10.2, .21, 3.58));
+  saveMesh("sheet", box(8.85, 2.55, .115));
+  saveMesh("conductiveTab", box(1.04, .68, .19));
+  saveMesh("dryFilm", box(1.55, 1.25, .035));
+  saveMesh("topGuide", makeDashedCircle(2.56, .012, .025, 52));
+  saveMesh("contactGuide", makeDashedCircle(2.165, .016, .026, 64));
+  saveMesh("thread", revolve([[.86, 0], [.94, .033], [.91, .077], [.86, .107]], false, 48));
+  saveMesh("threadSection", revolve([[.86, 0], [.94, .033], [.91, .077], [.86, .107]], true, 48));
+  saveMesh("pip", revolve(cylinder(.044, -.065, .065, .015), false, 16));
+  saveMesh("leakDot", revolve([
+    [0, -.088], [.071, -.074], [.095, -.033], [.094, .016], [.065, .074], [0, .119],
+  ], false, 32));
+  saveMesh("pool", revolve([[0, .005], [.24, .005], [.30, .027], [.23, .05], [0, .066]], false, 44));
+  saveMesh("stain", revolve([[0, .001], [.1, .001], [.125, .017], [.08, .022], [0, .022]], false, 26));
+
+  const leakRoute = [
+    [1.36, -2.17, .035], [1.39, -1.39, .045], [1.41, -.89, .045], [1.39, -.45, .045],
+    [1.40, -.08, .045], [1.42, .41, .045], [1.72, .45, .045], [1.85, .34, .045],
+    [2.04, .18, .045], [2.22, .076, .045], [2.73, .038, .045], [3.67, .028, .045],
+  ];
+  const track = [];
+  leakRoute.slice(1).forEach((point, index) => strokeBetween(track, leakRoute[index], point, .033));
+  saveMesh("leakTrack", track);
+  const gapStroke = [];
+  strokeBetween(gapStroke, [1.41, -.23, .045], [1.41, .37, .045], .045);
+  saveMesh("gapStroke", gapStroke);
+
+  const vertexShader = `
+    attribute vec3 position;
+    attribute vec3 normal;
+    uniform mat4 transform;
+    uniform vec3 origin;
+    uniform vec3 scale;
+    varying vec3 vPosition;
+    varying vec3 vNormal;
+    void main() {
+      vPosition = position * scale + origin;
+      vNormal = normalize(normal / scale);
+      gl_Position = transform * vec4(vPosition, 1.0);
+    }
+  `;
+  const fragmentShader = `
+    precision mediump float;
+    uniform vec3 baseColor;
+    uniform vec3 viewDirection;
+    uniform vec3 surface;
+    uniform float opacity;
+    varying vec3 vPosition;
+    varying vec3 vNormal;
+    void main() {
+      vec3 n = normalize(vNormal);
+      vec3 mainLight = normalize(vec3(-0.50, 0.84, 0.37));
+      vec3 edgeLight = normalize(vec3(0.18, 0.55, -0.82));
+      vec3 reflection = reflect(-viewDirection, n);
+      float primary = max(dot(n, mainLight), 0.0);
+      float edge = max(dot(n, edgeLight), 0.0);
+      float fresnel = pow(1.0 - max(dot(n, viewDirection), 0.0), 3.0);
+      float highlight = pow(max(dot(n, normalize(mainLight + viewDirection)), 0.0), 25.0);
+      float environment = smoothstep(-0.37, 0.87, reflection.y) * 0.25
+        + smoothstep(-0.06, 0.01, abs(reflection.y - 0.23) - 0.047) * 0.05;
+      float grain = sin(vPosition.x * 71.0 + vPosition.y * 10.0 + sin(vPosition.z * 27.0)) * 0.008;
+      vec3 shade = baseColor * (0.65 + primary * 0.45 + edge * 0.11 + surface.z);
+      shade += vec3(0.64, 0.75, 0.89) * (environment * surface.x + highlight * (surface.y + 0.17 * surface.x));
+      shade += vec3(0.43, 0.57, 0.73) * (fresnel * (0.16 + 0.24 * surface.x) + edge * 0.035);
+      shade += grain * surface.x;
+      gl_FragColor = vec4(clamp(shade, 0.0, 1.0), opacity);
+    }
+  `;
+
+  function makeWebGL(canvas) {
+    const gl = canvas.getContext("webgl", { alpha: true, antialias: true, premultipliedAlpha: false });
+    if (!gl) return null;
+
+    function shader(type, source) {
+      const handle = gl.createShader(type);
+      gl.shaderSource(handle, source);
+      gl.compileShader(handle);
+      if (!gl.getShaderParameter(handle, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(handle));
+      return handle;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, shader(gl.VERTEX_SHADER, vertexShader));
+    gl.attachShader(program, shader(gl.FRAGMENT_SHADER, fragmentShader));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
+    const locations = {};
+    for (const name of ["transform", "origin", "scale", "baseColor", "viewDirection", "surface", "opacity"]) {
+      locations[name] = gl.getUniformLocation(program, name);
+    }
+    const position = gl.getAttribLocation(program, "position");
+    const normal = gl.getAttribLocation(program, "normal");
+    const buffers = new Map();
+    let transparent = false;
+    gl.useProgram(program);
+    gl.enableVertexAttribArray(position);
+    gl.enableVertexAttribArray(normal);
+    gl.clearColor(0, 0, 0, 0);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.enable(gl.BLEND);
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+    return {
+      begin(camera) {
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.depthMask(true);
+        transparent = false;
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.uniformMatrix4fv(locations.transform, false, camera.matrix);
+        gl.uniform3fv(locations.viewDirection, camera.forward);
+      },
+      mesh(name, color, origin, scale, opacity) {
+        const vertices = meshData[name];
+        if (!vertices || !vertices.length) return;
+        const nextTransparent = opacity < 1;
+        if (transparent !== nextTransparent) {
+          gl.depthMask(!nextTransparent);
+          transparent = nextTransparent;
+        }
+        if (!buffers.has(name)) {
+          buffers.set(name, gl.createBuffer());
+          gl.bindBuffer(gl.ARRAY_BUFFER, buffers.get(name));
+          gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        } else {
+          gl.bindBuffer(gl.ARRAY_BUFFER, buffers.get(name));
+        }
+        gl.vertexAttribPointer(position, 3, gl.FLOAT, false, 24, 0);
+        gl.vertexAttribPointer(normal, 3, gl.FLOAT, false, 24, 12);
+        gl.uniform3fv(locations.baseColor, color.rgb);
+        gl.uniform3f(locations.surface, color.metal, color.shine, color.emission);
+        gl.uniform3fv(locations.origin, origin);
+        gl.uniform3fv(locations.scale, scale);
+        gl.uniform1f(locations.opacity, opacity);
+        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 6);
+      },
+      end() {},
+      destroy() {
+        buffers.forEach((buffer) => gl.deleteBuffer(buffer));
+        gl.deleteProgram(program);
+      },
+    };
+  }
+
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const subtract = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const normalized = (a) => a.map((value) => value / Math.hypot(...a));
+  const ambientDirection = normalized([-.5, .84, .37]);
+
+  function makeCanvasRenderer(canvas) {
+    const context = canvas.getContext("2d");
+    let camera;
+    let faces = [];
+    return {
+      begin(frame) {
+        camera = frame;
+        faces = [];
+        context.setTransform(canvas.width / camera.width, 0, 0, canvas.height / camera.height, 0, 0);
+        context.clearRect(0, 0, camera.width, camera.height);
+      },
+      mesh(name, color, origin, scale, opacity) {
+        const data = meshData[name];
+        if (!data) return;
+        for (let offset = 0; offset < data.length; offset += 18) {
+          const points = [0, 6, 12].map((i) => [
+            data[offset + i] * scale[0] + origin[0],
+            data[offset + i + 1] * scale[1] + origin[1],
+            data[offset + i + 2] * scale[2] + origin[2],
+          ]);
+          const normal = [data[offset + 3], data[offset + 4], data[offset + 5]];
+          const viewAngle = dot(normal, camera.forward);
+          if (viewAngle < -.10) continue;
+          const coordinates = points.map((p) => camera.project(p));
+          const depth = coordinates.reduce((sum, p) => sum + p.depth, 0) / 3;
+          const shade = .67 + Math.max(dot(normal, ambientDirection), 0) * .46 + color.emission;
+          const edge = (1 - Math.max(viewAngle, 0)) * (.08 + color.metal * .17);
+          const rgb = color.rgb.map((channel) => Math.min(255, Math.round((channel * shade + edge) * 255)));
+          faces.push({ coordinates, depth, color: `rgba(${rgb.join(",")},${opacity})` });
+        }
+      },
+      end() {
+        faces.sort((a, b) => a.depth - b.depth);
+        for (const { coordinates, color } of faces) {
+          context.beginPath();
+          context.moveTo(coordinates[0].x, coordinates[0].y);
+          context.lineTo(coordinates[1].x, coordinates[1].y);
+          context.lineTo(coordinates[2].x, coordinates[2].y);
+          context.closePath();
+          context.fillStyle = context.strokeStyle = color;
+          context.lineWidth = .45;
+          context.stroke();
+          context.fill();
+        }
+      },
+      destroy() {},
+    };
+  }
+
+  const MODES = {
+    cell: { yaw: -.57, pitch: .37, target: [0, -4.0, 0], fit: [33, 18] },
+    assembled: { yaw: -.52, pitch: .46, target: [0, -.77, 0], fit: [15.0, 9.8] },
+    exploded: { yaw: -.47, pitch: .37, target: [0, .23, 0], fit: [14.8, 11] },
+    section: { yaw: -.23, pitch: .24, target: [0, -1.0, 0], fit: [14.7, 9.2] },
+    leak: { yaw: -.20, pitch: .24, target: [0, -1.0, 0], fit: [14.7, 9.2] },
+    seal: { yaw: -.35, pitch: .50, target: [0, .22, 0], fit: [6.0, 5.4] },
+  };
+  const ORIGIN = [0, 0, 0];
+  const ONE = [1, 1, 1];
+  const limit = (value, min, max) => Math.max(min, Math.min(max, value));
+
+  function makeCamera(width, height, mode, yaw, pitch, zoom, explode) {
+    const config = MODES[mode];
+    const heightFit = config.fit[1] + (mode === "exploded" ? 4.8 * explode : 0);
+    const scale = Math.min(width / config.fit[0], height / heightFit) * zoom;
+    const target = config.target.slice();
+    if (mode === "exploded") target[1] += 1.48 * explode;
+    const cosYaw = Math.cos(yaw);
+    const sinYaw = Math.sin(yaw);
+    const cosPitch = Math.cos(pitch);
+    const sinPitch = Math.sin(pitch);
+    const right = [cosYaw, 0, -sinYaw];
+    const up = [-sinYaw * sinPitch, cosPitch, -cosYaw * sinPitch];
+    const forward = [sinYaw * cosPitch, sinPitch, cosYaw * cosPitch];
+    const x = right.map((v) => v * scale * 2 / width);
+    const y = up.map((v) => v * scale * 2 / height);
+    const z = forward.map((v) => v * -.032);
+    return {
+      width, height, scale, forward,
+      matrix: [
+        x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0,
+        -dot(x, target), -dot(y, target), -dot(z, target), 1,
+      ],
+      project(point) {
+        const relative = subtract(point, target);
+        return {
+          x: width / 2 + dot(right, relative) * scale,
+          y: height / 2 - dot(up, relative) * scale,
+          depth: dot(forward, relative),
+        };
+      },
+    };
+  }
+
+  function sampleRoute(fraction) {
+    const proportion = fraction * (leakRoute.length - 1);
+    const index = Math.min(Math.floor(proportion), leakRoute.length - 2);
+    const t = proportion - index;
+    return leakRoute[index].map((value, axis) => value + (leakRoute[index + 1][axis] - value) * t);
+  }
+
+  window.createBatteryScene = (canvas, options = {}) => {
+    const renderer = makeWebGL(canvas) || makeCanvasRenderer(canvas);
+    let mode = "exploded";
+    let yaw = MODES[mode].yaw;
+    let pitch = MODES[mode].pitch;
+    let explode = .74;
+    let visibleExplode = explode;
+    let phase = 0;
+    let zoom = 1;
+    let selected = "";
+    let autoRotate = false;
+    let frameId = 0;
+    let lastTime = 0;
+    let labels = [];
+    let mouseMoved = false;
+    let pinchSpan = 0;
+    const pointers = new Map();
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function render(time) {
+      frameId = 0;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (!width || !height) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const pixelWidth = Math.round(width * dpr);
+      const pixelHeight = Math.round(height * dpr);
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+      }
+      if (autoRotate) yaw += Math.min(35, time - (lastTime || time)) * .00045;
+      lastTime = time;
+      visibleExplode += (explode - visibleExplode) * (reduceMotion ? 1 : .20);
+      if (Math.abs(explode - visibleExplode) < .006) visibleExplode = explode;
+      const camera = makeCamera(width, height, mode, yaw, pitch, zoom, visibleExplode);
+      const anchors = [];
+      const draw = (name, color, origin = ORIGIN, scale = ONE, opacity = 1) => renderer.mesh(name, color, origin, scale, opacity);
+      const mark = (id, point) => {
+        const { x, y, depth } = camera.project(point);
+        anchors.push({ id, x, y, depth, visible: x >= 0 && y >= 0 && x < width && y < height });
+      };
+      const useColor = (name, color) => {
+        if (selected !== name) return color;
+        const mix = name === "seal" ? .075 : .32;
+        return { ...color, rgb: color.rgb.map((v, index) => v * (1 - mix) + [.25, .48, .82][index] * mix), emission: color.emission + .052 };
+      };
+      const pieces = (isSection, sealOffset, terminalOffset, insertOffset) => {
+        const sealBase = -.281 + sealOffset;
+        const terminalBase = terminalOffset;
+        const detail = isSection ? "Section" : "";
+        const sealColor = useColor("seal", SURFACE.black);
+        const gap = mode === "leak" && phase > 0;
+        draw(gap ? "sealGapSection" : "seal" + detail, sealColor, [0, sealBase, 0]);
+        draw("post" + detail, useColor("terminal", SURFACE.steel), [0, terminalBase, 0]);
+        draw("insert" + detail, useColor("insulator", SURFACE.insulator), [0, insertOffset, 0]);
+        for (let turn = 0; turn < 5; turn++) {
+          draw("thread" + detail, SURFACE.steelDark, [0, terminalBase + 1.29 + turn * .137, 0]);
+        }
+        if (isSection) {
+          const sectionParts = [
+            ["sealCut", useColor("seal", SURFACE.cutBlack), sealBase, gap ? "sealGapCut" : "sealCut"],
+            ["postCut", SURFACE.cutSteel, terminalBase, "postCut"],
+            ["insertCut", SURFACE.cutInsulator, insertOffset, "insertCut"],
+          ];
+          for (const [plain, color, height, right] of sectionParts) {
+            draw(right, color, [0, height, .002]);
+            draw(plain, color, [0, height, .002], [-1, 1, 1]);
+          }
+        }
+        mark("terminal", [.78, terminalBase + 1.57, isSection ? .02 : .78]);
+        mark("seal", [isSection ? -1.89 : -1.35, sealBase + .30, isSection ? .01 : 1.34]);
+        if (mode !== "assembled") mark("insulator", [1.64, -.72 + insertOffset, isSection ? .03 : .62]);
+      };
+
+      renderer.begin(camera);
+      if (mode === "cell") {
+        draw("fullBody", useColor("shell", SURFACE.body));
+        draw("fullLid", useColor("lid", SURFACE.aluminum));
+        for (const x of [-9.45, 9.45]) {
+          draw("fullShoulder", x < 0 ? useColor("seal", SURFACE.blackEdge) : SURFACE.blackEdge, [x, 0, 0]);
+          draw("fullTerminal", x < 0 ? useColor("terminal", SURFACE.steel) : SURFACE.steel, [x, 0, 0]);
+          draw("fullTerminalInset", x < 0 ? useColor("terminal", SURFACE.rim) : SURFACE.rim, [x, 0, 0]);
+          draw("horizontalSign", SURFACE.opening, [x, .57, 0]);
+        }
+        draw("verticalSign", SURFACE.opening, [-9.45, .57, 0]);
+        draw("vent", SURFACE.steelDark);
+        draw("ventInset", SURFACE.rim);
+        draw("ventLine", SURFACE.steelDark, [0, .105, 0]);
+        draw("fillPort", SURFACE.steelDark, [4.45, 0, 0]);
+        draw("fillPortInset", SURFACE.rim, [4.45, 0, 0]);
+        for (const x of [-12.43, 12.43]) {
+          for (const z of [-3.1, 3.1]) draw("assemblyDot", SURFACE.opening, [x, 0, z]);
+        }
+        draw("topGuide", SURFACE.guidesDark, [-9.45, .004, 0], ONE, .85);
+        mark("terminal", [-9.45, .55, 0]);
+        mark("lid", [-5.52, 0, 2.42]);
+        mark("seal", [-9.45, .20, 1.57]);
+        mark("vent", [0, .12, 0]);
+        mark("fill", [4.45, .12, 0]);
+        mark("shell", [4.6, -5.3, 4.0]);
+      } else if (mode === "seal") {
+        draw("seal", useColor("seal", SURFACE.black));
+        draw("topGuide", SURFACE.guide, [0, -.02, 0], ONE, .62);
+        mark("seal", [-1.74, .3025, .92]);
+        mark("bore", [ring.bore * .81, ring.height, ring.bore * -.59]);
+        mark("collar", [.77, ring.height, 1.33]);
+      } else {
+        const isSection = mode === "section" || mode === "leak";
+        const detail = isSection ? "Section" : "";
+        const separation = mode === "exploded" ? visibleExplode : 0;
+        if (mode === "assembled") {
+          draw("shell", useColor("shell", SURFACE.body));
+          mark("shell", [-3.7, -2.49, 3.64]);
+        }
+        if (mode === "exploded") {
+          const offset = -3.12 * separation;
+          draw("shellFloor", useColor("shell", SURFACE.inside), [0, offset, 0]);
+          draw("shellSkirt", useColor("shell", SURFACE.body), [0, offset, 0]);
+          mark("shell", [-3.85, offset - .94, 3.64]);
+        }
+        if (isSection) {
+          draw("wall", SURFACE.body, [-5.10, -2.38, -1.79]);
+          draw("wall", SURFACE.body, [5.10, -2.38, -1.79]);
+          draw("rear", SURFACE.body, [0, -2.38, -3.59]);
+          draw("bottom", SURFACE.cutAluminum, [0, -4.17, -1.79]);
+          for (let index = 0; index < 16; index++) {
+            const material = [SURFACE.sheet, SURFACE.separator, SURFACE.copper, SURFACE.separator][index % 4];
+            draw("sheet", useColor("core", material), [0, -2.71, -.63 - index * .14]);
+          }
+          draw("conductiveTab", SURFACE.copper, [0, -1.30, -.69]);
+          draw("lidCut", useColor("lid", SURFACE.cutAluminum), [0, 0, .001]);
+          mark("core", [2.05, -2.75, -.43]);
+        }
+        draw("detailLid" + detail, useColor("lid", SURFACE.aluminum));
+        draw("bore" + detail, SURFACE.steelDark);
+        for (const x of [-4.36, 4.36]) {
+          for (const z of isSection ? [-2.88] : [-2.88, 2.88]) {
+            draw("assemblyDot", SURFACE.opening, [x, 0, z], [1.35, 1.35, 1.35]);
+          }
+        }
+        pieces(isSection, 3.48 * separation, 6.65 * separation, -2.42 * separation);
+        mark("lid", [isSection ? -4.3 : -3.62, -.15, isSection ? .015 : 2.56]);
+
+        if (separation > .08) {
+          draw("topGuide", SURFACE.guide, [0, .015, 0], ONE, .76);
+          for (let y = .20; y < .10 + 6.65 * separation; y += .26) {
+            draw("pip", SURFACE.guidesDark, [0, y, 0], [.63, 1, .63], .76);
+          }
+        } else if (mode === "assembled" || mode === "section" || (mode === "leak" && phase === 0)) {
+          draw("contactGuide", SURFACE.contact, [0, .002, 0], ONE, .61);
+        }
+
+        if (mode === "leak" && phase > 0) {
+          if (phase >= 2) {
+            draw("pool", SURFACE.fluid, [2.58, .012, -.08], [1.78, .81, .84]);
+            draw("pool", SURFACE.fluidLight, [2.31, .018, -.06], [.60, .85, .67]);
+            draw("leakTrack", SURFACE.fluidLight, ORIGIN, ONE, .82);
+            for (let drop = 0; drop < 5; drop++) {
+              const t = (((reduceMotion ? 2180 : time) / 3100) + .198 * drop) % 1;
+              const size = .83 + (drop % 3) * .095;
+              draw("leakDot", SURFACE.fluid, sampleRoute(t), [size, size, size]);
+            }
+            mark("leak", [2.62, .05, .055]);
+          }
+          if (phase === 3) {
+            draw("pool", SURFACE.fluid, [3.5, .020, -.14], [2.38, .88, 1.42]);
+            draw("pool", SURFACE.fluid, [4.21, .014, -.32], [1.32, .83, 1.48]);
+            const stains = [[3.36, -.42], [3.8, -.68], [4.24, -.75], [4.33, -.53], [4.66, -.36], [4.46, -.92], [4.78, -.68]];
+            for (const [x, z] of stains) draw("stain", SURFACE.residue, [x, .016, z]);
+            const deposits = [
+              [1.58, .473, .048], [1.67, .514, .048], [1.76, .555, .048], [1.79, .490, .043],
+              [1.86, .446, .039], [1.93, .362, .041], [2.04, .252, .042], [2.15, .138, .049],
+              [2.23, .104, -.21], [2.18, .102, -.40], [2.10, .100, -.56],
+            ];
+            for (const [x, y, z] of deposits) draw("leakDot", SURFACE.residue, [x, y, z], [.42, .28, .46]);
+            draw("dryFilm", SURFACE.dryRegion, [1.8, -2.92, -.546], ONE, .64);
+            for (let index = 0; index < 7; index++) {
+              const x = 1.14 + index * .218;
+              draw("pip", SURFACE.warning, [x, -2.35, -.514], [1.18, .19, .65], .72);
+              draw("pip", SURFACE.warning, [x, -3.49, -.514], [1.18, .19, .65], .72);
+            }
+            mark("residue", [1.89, .44, .078]);
+            mark("interior", [2.28, -3.25, -.505]);
+          }
+          draw("gapStroke", SURFACE.warning, ORIGIN, ONE, .94);
+          mark("gap", [1.41, .28, .06]);
+        }
+      }
+      renderer.end();
+      labels = anchors;
+      options.onFrame?.(labels);
+      if (autoRotate || (mode === "leak" && phase >= 2 && !reduceMotion) || visibleExplode !== explode) invalidate();
+    }
+
+    function invalidate() {
+      if (!frameId) frameId = requestAnimationFrame(render);
+    }
+
+    function reset() {
+      yaw = MODES[mode].yaw;
+      pitch = MODES[mode].pitch;
+      zoom = 1;
+      invalidate();
+    }
+
+    function changeZoom(factor) {
+      if (Number.isFinite(factor) && factor > 0) zoom = limit(zoom * factor, .66, 2.9);
+      invalidate();
+    }
+
+    function changeAngles(dx, dy) {
+      yaw += dx;
+      pitch = limit(pitch + dy, -.36, 1.40);
+      if (mode === "section" || mode === "leak") {
+        yaw = limit(yaw, -1.25, 1.25);
+        pitch = limit(pitch, -.06, .92);
+      }
+      invalidate();
+    }
+
+    function pointerDown(event) {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (!pointers.size) mouseMoved = false;
+      pointers.set(event.pointerId, [event.clientX, event.clientY]);
+      canvas.setPointerCapture(event.pointerId);
+      if (pointers.size > 1) {
+        mouseMoved = true;
+        pinchSpan = 0;
+      }
+    }
+
+    function pointerMove(event) {
+      if (!pointers.has(event.pointerId)) return;
+      const [previousX, previousY] = pointers.get(event.pointerId);
+      const dx = event.clientX - previousX;
+      const dy = event.clientY - previousY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) mouseMoved = true;
+      pointers.set(event.pointerId, [event.clientX, event.clientY]);
+      if (pointers.size > 1) {
+        const [a, b] = pointers.values();
+        const span = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (pinchSpan > 1) changeZoom(span / pinchSpan);
+        pinchSpan = span;
+        return;
+      }
+      if (mouseMoved) changeAngles(-dx * .008, dy * .008);
+    }
+
+    function pointerUp(event) {
+      const isActive = pointers.delete(event.pointerId);
+      if (!isActive || event.type !== "pointerup" || mouseMoved || pointers.size || !options.onPick) return;
+      const { left, top } = canvas.getBoundingClientRect();
+      const x = event.clientX - left;
+      const y = event.clientY - top;
+      const distances = labels.filter((label) => label.visible).map((label) => ({
+        id: label.id, value: Math.hypot(label.x - x, label.y - y),
+      }));
+      distances.sort((a, b) => a.value - b.value);
+      if (distances[0]?.value <= 64) options.onPick(distances[0].id);
+    }
+
+    function wheel(event) {
+      event.preventDefault();
+      changeZoom(Math.exp(limit(-event.deltaY * .002, -.27, .27)));
+    }
+
+    function keydown(event) {
+      const actions = {
+        ArrowLeft: () => changeAngles(.14, 0),
+        ArrowRight: () => changeAngles(-.14, 0),
+        ArrowUp: () => changeAngles(0, .12),
+        ArrowDown: () => changeAngles(0, -.12),
+        "+": () => changeZoom(1.12),
+        "=": () => changeZoom(1.12),
+        "-": () => changeZoom(.89),
+        Home: reset,
+      };
+      if (!actions[event.key]) return;
+      event.preventDefault();
+      actions[event.key]();
+    }
+
+    const events = { pointerdown: pointerDown, pointermove: pointerMove, pointerup: pointerUp, pointercancel: pointerUp, lostpointercapture: pointerUp, wheel, keydown };
+    for (const [name, handler] of Object.entries(events)) canvas.addEventListener(name, handler, { passive: false });
+    canvas.style.touchAction = "none";
+    if (!canvas.hasAttribute("tabindex")) canvas.tabIndex = 0;
+    const resize = new ResizeObserver(invalidate);
+    resize.observe(canvas);
+    invalidate();
+
+    return {
+      setMode(value) {
+        if (!Object.prototype.hasOwnProperty.call(MODES, value) || mode === value) return;
+        mode = value;
+        reset();
+      },
+      setExplode(value) {
+        if (Number.isFinite(value)) explode = limit(value, 0, 1);
+        invalidate();
+      },
+      setHighlight(part) {
+        selected = part || "";
+        invalidate();
+      },
+      setLeakPhase(value) {
+        if (Number.isFinite(value)) phase = limit(Math.round(value), 0, 3);
+        invalidate();
+      },
+      reset,
+      zoom: changeZoom,
+      setAutoRotate(value) {
+        autoRotate = Boolean(value);
+        invalidate();
+      },
+      destroy() {
+        resize.disconnect();
+        cancelAnimationFrame(frameId);
+        for (const [name, handler] of Object.entries(events)) canvas.removeEventListener(name, handler);
+        renderer.destroy();
+      },
+    };
+  };
+})();
+</script>
+<script>
+(() => {
+  "use strict";
+
+  const el = id => document.getElementById(id);
+  const modeButtons = [...document.querySelectorAll("[data-mode]")];
+  const canvas = el("scene");
+  const stage = el("stage");
+
+  const parts = {
+    terminal: {
+      name: "极柱", label: "极柱", short: "与电芯电极相连", color: "#a8bece",
+      text: "极柱穿过铝顶盖孔，把内部电极引到外部。模型放大了其中一处圆形极柱，用于观察周围的密封界面。"
+    },
+    seal: {
+      name: "黑色密封圈", label: "密封圈", short: "本次送样部件", color: "#202b39",
+      text: "一体式台阶环。通孔套在极柱周围，突起的窄凸缘与下方宽法兰形成台阶，宽法兰落在盖板沉孔示意位置。"
+    },
+    lid: {
+      name: "铝顶盖", label: "铝顶盖", short: "沉孔容纳密封圈", color: "#bac9d8",
+      text: "顶盖封住方形壳体。密封圈所在的沉孔提供座面。极柱区、注液口和防爆阀是顶盖上各自独立的位置。"
+    },
+    insulator: {
+      name: "绝缘支撑（示意）", label: "绝缘支撑", short: "盖板下方的通用结构", color: "#b6c9bf",
+      text: "示意盖板下方的支撑与电隔离结构。实际绝缘方案、零件数量和装配顺序以客户总成图为准。"
+    },
+    shell: {
+      name: "电芯壳体", label: "电芯壳体", short: "包住内部电极组件", color: "#829bb0",
+      text: "方形壳体与顶盖围成内部空间。此处使用通用外形说明极柱密封圈与单颗电芯的相对位置。"
+    },
+    core: {
+      name: "电极组件（示意）", label: "电极组件", short: "正极、负极与隔膜", color: "#698e8b",
+      text: "模型用层状结构表示内部电极组件。液态电解液主要浸润电极与隔膜的孔隙。实际卷绕或叠片方式需由客户确认。"
+    },
+    vent: {
+      name: "防爆阀", label: "防爆阀", short: "顶盖上的泄压结构", color: "#879eb7",
+      text: "防爆阀位于顶盖，电芯内部压力异常升高时可用于受控泄压。模型只示意位置。"
+    },
+    fill: {
+      name: "注液口", label: "注液口", short: "生产时用于注入电解液", color: "#aabacb",
+      text: "注液口是电芯生产阶段的注液位置，注液后按工艺封闭。"
+    }
+  };
+  const staticLabels = {
+    gap: "局部间隙", leak: "渗出方向", residue: "外侧残留", interior: "浸润可能不足",
+    bore: "通孔", collar: "上凸缘"
+  };
+
+  const modes = {
+    cell: {
+      caption: "方形电芯总览", title: "单颗电芯",
+      summary: "先找顶盖两处极柱，再切换到装配位置观察其中一处密封区域。",
+      parts: ["terminal", "lid", "vent", "fill", "shell"], labels: ["terminal", "vent", "fill", "shell"], start: "terminal"
+    },
+    assembled: {
+      caption: "极柱装配位置", title: "密封圈装在哪里",
+      summary: "放大单个极柱。黑色密封圈围在极柱周围，下方是铝顶盖的沉孔座面。",
+      parts: ["seal", "terminal", "lid", "shell"], labels: ["seal", "terminal", "lid"], start: "seal"
+    },
+    exploded: {
+      caption: "极柱总成爆炸图", title: "极柱总成",
+      summary: "沿极柱轴向拉开零件，查看密封圈、极柱与顶盖沉孔的相对位置。",
+      parts: ["terminal", "seal", "lid", "insulator", "shell"], labels: ["terminal", "seal", "lid", "insulator", "shell"], start: "seal"
+    },
+    section: {
+      caption: "穿过极柱轴线的剖面", title: "密封面怎样贴合",
+      summary: "观察通孔内壁靠近极柱，以及宽法兰与顶盖座面贴合的位置。两处界面都可能影响密封性。",
+      parts: ["seal", "terminal", "lid", "insulator", "core"], labels: ["terminal", "seal", "lid"], start: "seal"
+    },
+    seal: {
+      caption: "台阶密封圈单件", title: "黑色台阶密封圈",
+      summary: "从上方看贯通的内孔，从侧面看上凸缘与下法兰形成的台阶。拖动模型可检查底面。",
+      parts: ["seal"], labels: ["seal", "bore", "collar"], start: "seal"
+    },
+    leak: {
+      caption: "极柱密封失效", title: "渗漏如何发生",
+      summary: "对照正常压合，再沿放大剖面看局部间隙、渗出和可能后果。",
+      parts: [], labels: ["gap", "leak", "residue", "interior"], start: null
+    }
+  };
+
+  const phases = [
+    {
+      name: "正常压合",
+      description: "极柱周围的密封面保持贴合，封住从电芯内侧通往顶盖外侧的路径。"
+    },
+    {
+      name: "局部出现间隙",
+      description: "密封面局部失去贴合。压合不足、装配偏斜或密封件损伤都可能留下通道。"
+    },
+    {
+      name: "电解液渗出",
+      description: "在条件允许时，电解液可沿界面间隙渗到顶盖表面，形成局部液膜或残留。微漏也可能看不到液滴。"
+    },
+    {
+      name: "可能后果",
+      description: "外部残液可能腐蚀端子或降低端子与盖板之间的绝缘。持续失液可能导致内阻上升、容量衰减。若进一步出现短路或异常发热，热风险会升高。"
+    }
+  ];
+
+  let scene;
+  let mode = "exploded";
+  let selection = null;
+  let phase = 0;
+  let playing = false;
+  let leakTimer;
+  let toastTimer;
+  const annotationNodes = new Map();
+
+  function addRadioButton(container, partId) {
+    const part = parts[partId];
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "part";
+    button.dataset.part = partId;
+    button.setAttribute("aria-pressed", "false");
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    swatch.style.setProperty("--part-color", part.color);
+    const text = document.createElement("span");
+    const name = document.createElement("strong");
+    name.textContent = part.name;
+    const short = document.createElement("small");
+    short.textContent = part.short;
+    text.append(name, short);
+    const chevron = document.createElement("span");
+    chevron.className = "part-arrow";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "›";
+    button.append(swatch, text, chevron);
+    button.addEventListener("click", () => selectPart(partId));
+    container.append(button);
+  }
+
+  function renderList() {
+    const body = el("panel-body");
+    const heading = document.createElement("span");
+    heading.className = "panel-heading";
+    heading.textContent = mode === "leak" ? "选择演示步骤" : "点击部件查看";
+    const list = document.createElement("div");
+    list.className = "part-list";
+    if (mode === "leak") {
+      phases.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "leak-step";
+        button.dataset.phase = index;
+        const number = document.createElement("span");
+        number.textContent = String(index + 1).padStart(2, "0");
+        const label = document.createElement("strong");
+        label.textContent = item.name;
+        button.append(number, label);
+        button.addEventListener("click", () => {
+          stopLeakPlayback();
+          setPhase(index);
+        });
+        list.append(button);
+      });
+    } else {
+      modes[mode].parts.forEach(id => addRadioButton(list, id));
+    }
+    body.replaceChildren(heading, list);
+  }
+
+  function renderDetail(title, description, shortcut) {
+    const detail = el("detail");
+    detail.classList.toggle("failure", mode === "leak");
+    const name = document.createElement("strong");
+    name.textContent = title;
+    const paragraph = document.createElement("p");
+    paragraph.textContent = description;
+    detail.replaceChildren(name, paragraph);
+    if (shortcut) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = shortcut.label + " ›";
+      button.addEventListener("click", () => setMode(shortcut.mode));
+      detail.append(button);
+    }
+  }
+
+  function selectPart(partId) {
+    if (!modes[mode].parts.includes(partId)) return;
+    selection = partId;
+    scene?.setHighlight(partId);
+    for (const button of document.querySelectorAll(".part, button.annotation")) {
+      button.setAttribute("aria-pressed", String(button.dataset.part === partId));
+    }
+    const part = parts[partId];
+    const shortcut = mode === "seal" ? {mode: "section", label: "查看密封剖面"}
+      : partId === "seal" ? {mode: "seal", label: "单独查看密封圈"}
+      : mode === "cell" && partId === "terminal" ? {mode: "assembled", label: "放大极柱装配"}
+      : null;
+    renderDetail(part.name, part.text, shortcut);
+  }
+
+  function getAnnotation(partId) {
+    if (annotationNodes.has(partId)) return annotationNodes.get(partId);
+    const staticLabel = staticLabels[partId];
+    const node = document.createElement(staticLabel ? "span" : "button");
+    node.className = "annotation" + (staticLabel ? " static-label" : "");
+    node.dataset.part = partId;
+    node.hidden = true;
+    node.textContent = staticLabel || parts[partId].label;
+    if (!staticLabel) {
+      node.type = "button";
+      node.addEventListener("click", () => selectPart(partId));
+    }
+    el("annotations").append(node);
+    annotationNodes.set(partId, node);
+    return node;
+  }
+
+  function updateAnnotations(frame) {
+    const labels = Array.isArray(frame) ? frame : Object.entries(frame || {}).map(([id, data]) => ({id, ...data}));
+    const allowed = modes[mode].labels;
+    const width = stage.clientWidth;
+    const height = stage.clientHeight;
+    const visible = new Set();
+    const occupied = [];
+    for (const {id, x, y, visible: show} of [...labels].sort((a, b) => allowed.indexOf(a.id) - allowed.indexOf(b.id))) {
+      if (!allowed.includes(id) || show === false || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (mode === "leak" && ((phase === 3 && (id === "gap" || id === "leak")) || (phase === 2 && id === "gap"))) continue;
+      if (y < 45 || y > height - 52 || x < 8 || x > width - 8) continue;
+      const right = width - x;
+      const side = ["lid", "shell", "collar", "interior"].includes(id)
+        ? (x > 110 ? "left" : "right")
+        : (right > 114 ? "right" : "left");
+      if (occupied.some(p => p.side === side && Math.abs(p.y - y) < 24 && Math.abs(p.x - x) < 120)) continue;
+      const node = getAnnotation(id);
+      node.hidden = false;
+      node.style.left = x + "px";
+      node.style.top = y + "px";
+      node.classList.toggle("left", side === "left");
+      if (!staticLabels[id]) node.setAttribute("aria-pressed", String(selection === id));
+      visible.add(id);
+      occupied.push({x, y, side});
+    }
+    for (const [id, node] of annotationNodes) node.hidden = !visible.has(id);
+  }
+
+  function stopLeakPlayback() {
+    clearTimeout(leakTimer);
+    playing = false;
+    el("play-leak").textContent = "▶ 播放过程";
+  }
+
+  function setPhase(index) {
+    phase = index;
+    scene?.setLeakPhase(index);
+    for (const button of document.querySelectorAll(".leak-step")) {
+      button.setAttribute("aria-pressed", String(Number(button.dataset.phase) === index));
+    }
+    el("leak-progress").textContent = String(index + 1) + " / " + phases.length + " · " + phases[index].name;
+    el("prev-phase").disabled = index === 0;
+    el("next-phase").disabled = index === phases.length - 1;
+    el("stage-key").hidden = index < 2;
+    const item = phases[index];
+    renderDetail(item.name, item.description);
+  }
+
+  function playLeak() {
+    if (playing) {
+      stopLeakPlayback();
+      return;
+    }
+    playing = true;
+    el("play-leak").textContent = "Ⅱ 暂停";
+    if (phase === phases.length - 1) setPhase(0);
+    const advance = () => {
+      if (!playing) return;
+      if (phase === phases.length - 1) {
+        stopLeakPlayback();
+        return;
+      }
+      setPhase(phase + 1);
+      leakTimer = setTimeout(advance, phase === 2 ? 3200 : 2500);
+    };
+    leakTimer = setTimeout(advance, 1750);
+  }
+
+  function setMode(nextMode, updateLocation = true) {
+    if (!Object.hasOwn(modes, nextMode)) return;
+    stopLeakPlayback();
+    mode = nextMode;
+    selection = null;
+    const item = modes[mode];
+    for (const button of modeButtons) button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+    for (const node of annotationNodes.values()) node.hidden = true;
+
+    el("scene-title").textContent = item.caption;
+    el("panel-title").textContent = item.title;
+    el("panel-text").textContent = item.summary;
+    el("explode-control").hidden = mode !== "exploded";
+    el("leak-control").hidden = mode !== "leak";
+    el("stage-key").hidden = true;
+
+    const rotate = el("rotate");
+    rotate.setAttribute("aria-pressed", "false");
+    scene?.setAutoRotate(false);
+    scene?.setMode(mode);
+    scene?.reset();
+    renderList();
+
+    if (mode === "exploded") scene?.setExplode(Number(el("explode").value) / 100);
+    if (mode === "leak") setPhase(0);
+    else selectPart(item.start);
+
+    if (updateLocation) {
+      try { history.replaceState(null, "", "#" + mode); }
+      catch { /* A browser may restrict file URL history changes. */ }
+    }
+  }
+
+  const copyLink = async () => {
+    if (location.protocol === "file:") {
+      showToast("可把这个 HTML 文件直接发给同事");
+      return;
+    }
+    const url = new URL(location.href);
+    url.hash = mode;
+    try {
+      await navigator.clipboard.writeText(url.href);
+      showToast("当前视图链接已复制");
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = url.href;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.append(input);
+      input.select();
+      const copied = document.execCommand("copy");
+      input.remove();
+      if (copied) showToast("当前视图链接已复制");
+      else window.prompt("复制当前视图链接", url.href);
+    }
+  };
+
+  function showToast(message) {
+    clearTimeout(toastTimer);
+    const toast = el("toast");
+    toast.textContent = message;
+    toast.hidden = false;
+    toastTimer = setTimeout(() => { toast.hidden = true; }, 3000);
+  }
+
+  try {
+    scene = window.createBatteryScene(canvas, {
+      onFrame: updateAnnotations,
+      onPick: selectPart
+    });
+  } catch (error) {
+    console.error(error);
+    el("no-scene").hidden = false;
+  }
+
+  const requestedMode = location.hash.slice(1);
+  setMode(Object.hasOwn(modes, requestedMode) ? requestedMode : "exploded", false);
+  for (const button of modeButtons) {
+    button.addEventListener("click", () => setMode(button.dataset.mode));
+  }
+  addEventListener("hashchange", () => {
+    const hash = location.hash.slice(1);
+    if (hash !== mode && Object.hasOwn(modes, hash)) setMode(hash, false);
+  });
+
+  el("explode").addEventListener("input", event => {
+    const value = Number(event.target.value);
+    el("explode-value").value = value + "%";
+    scene?.setExplode(value / 100);
+  });
+  el("zoom-in").addEventListener("click", () => scene?.zoom(1.18));
+  el("zoom-out").addEventListener("click", () => scene?.zoom(1 / 1.18));
+  el("reset").addEventListener("click", () => {
+    scene?.setAutoRotate(false);
+    el("rotate").setAttribute("aria-pressed", "false");
+    scene?.reset();
+  });
+  el("rotate").addEventListener("click", event => {
+    const active = event.currentTarget.getAttribute("aria-pressed") !== "true";
+    event.currentTarget.setAttribute("aria-pressed", String(active));
+    scene?.setAutoRotate(active);
+  });
+  el("share").addEventListener("click", copyLink);
+  el("play-leak").addEventListener("click", playLeak);
+  for (const [id, offset] of [["prev-phase", -1], ["next-phase", 1]]) {
+    el(id).addEventListener("click", () => {
+      stopLeakPlayback();
+      setPhase(phase + offset);
+    });
+  }
+  if (location.protocol === "file:") {
+    el("share").lastChild.textContent = "分享文件";
+  }
+})();
+</script>
+</body>
+</html>
