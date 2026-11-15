@@ -35,6 +35,8 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Build interactive viewer
         run: node build.mjs
+      - name: Stage battery terminal seal page
+        run: install -D -m 0644 battery-seal/index.html dist/battery-seal/index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
