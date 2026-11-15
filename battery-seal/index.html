@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="交互查看方形电芯的极柱密封圈、装配剖面及密封失效路径。">
+  <meta name="description" content="播放电池包内的电芯拆装与供电动画，交互查看极柱密封圈和失效路径。">
   <meta name="theme-color" content="#142435">
   <title>电池芯密封圈 · 三维拆解</title>
   <style>
@@ -47,6 +47,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 .tabs button:hover { background: #f1f6fb; }
 .tabs button[aria-pressed="true"] { background: #e9f2ff; border-color: #c6ddfa; font-weight: 700; color: #1354aa; }
 .tabs button i { border-radius: 50%; width: 6px; height: 6px; background: #93aac2; }
+.tabs button[data-mode="pack"] { color: #145681; background: #edf6fb; border-color: #d9eaf4; }
+.tabs button[data-mode="pack"][aria-pressed="true"] { background: #e0eff8; border-color: #aad0eb; }
+.tabs button[data-mode="pack"] svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .tabs button[aria-pressed="true"] i { background: #226ac5; }
 .tabs button[data-mode="leak"] i { background: #d19554; }
 .stage {
@@ -61,6 +64,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 .stage-title strong { font-size: 13px; letter-spacing: .02em; color: #223b56; }
 .stage-key { position: absolute; bottom: 18px; left: 16px; border-radius: 5px; background: #fff6e6; padding: 5px 8px; color: #8a430d; font-size: 11px; font-weight: 650; pointer-events: none; }
 .stage-key span { display: inline-block; background: #d37a1a; border-radius: 50%; width: 7px; height: 7px; margin-right: 4px; }
+.pack-key { color: #164f72; background: #edf7ff; }
+.pack-key span:first-child { background: #2c8cb9; }
+.pack-key #pack-key-text { width: auto; height: auto; margin: 0; background: transparent; border-radius: 0; }
+.pack-key[data-step="2"] span:first-child { background: #d17d28; }
 #annotations { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; }
 .annotation {
   --a-color: #52779f; --leader: 24px;
@@ -74,6 +81,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 .annotation.left::before { right: auto; left: 100%; }
 .annotation.left::after { right: auto; left: calc(100% + var(--leader) - 3px); }
 .annotation[data-part="seal"] { --a-color: #287be4; background: #edf5ff; border-color: #93bbeb; color: #164d98; }
+.annotation[data-part="pack-cell"] { --a-color: #bb712d; background: #fff7e9; border-color: #d9a365; color: #864208; }
 .annotation.static-label { pointer-events: none; }
 .annotation[data-part="gap"], .annotation[data-part="leak"], .annotation[data-part="residue"], .annotation[data-part="interior"] {
   --a-color: #b76e27; color: #864208; background: #fff7e9; border-color: #d9a365;
@@ -84,7 +92,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 .camera button:hover, .camera button[aria-pressed="true"] { background: #dfedfd; }
 .no-scene { position: absolute; inset: 40% 10% auto; padding: 15px; background: #fff; border-radius: 7px; text-align: center; font-size: 14px; }
 .viewer-footer { min-height: 55px; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); background: #fff; }
-.explode-control, .leak-control { display: flex; align-items: center; gap: 12px; font-size: 13px; white-space: nowrap; }
+.explode-control, .leak-control, .pack-control { display: flex; align-items: center; gap: 12px; font-size: 13px; white-space: nowrap; }
 .explode-control label { font-weight: 650; }
 .explode-control input { width: clamp(75px, 16vw, 240px); accent-color: #226ac5; cursor: pointer; margin: 0; }
 .explode-control output { color: var(--blue); min-width: 36px; font: 12px "IBM Plex Mono", ui-monospace, monospace; }
@@ -94,13 +102,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 .step-control:disabled { opacity: .35; cursor: default; }
 .step-control:not(:disabled):hover { background: #fff5e7; }
 #leak-progress { color: #764312; font-size: 12px; }
+.pack-control .play, .pack-control .step-control { border-color: #b5d4eb; color: #175781; background: #f0f8ff; }
+.pack-control .step-control:not(:disabled):hover, .pack-control .play:hover { background: #dfedf8; }
+#pack-progress { color: #295c83; font-size: 12px; }
 .sidebar { padding: 20px 17px 17px; }
 .sidebar h2 { margin: 0 0 8px; font-size: 21px; line-height: 1.3; }
 .panel-text, .detail p { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 0; }
 #panel-body { margin-top: 17px; }
 .panel-heading { display: block; margin: 0 0 8px; font-size: 12px; color: var(--muted); font-weight: 700; }
 .part-list { display: grid; gap: 7px; }
-.part, .leak-step {
+.part, .leak-step, .pack-step {
   text-align: left; width: 100%; background: #fff; border: 1px solid #dde6ef; border-radius: 8px; min-height: 51px;
   padding: 8px 9px; display: grid; grid-template-columns: 23px minmax(0, 1fr) auto; gap: 9px; align-items: center;
 }
@@ -109,7 +120,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 .swatch { width: 21px; height: 21px; border-radius: 50%; background: var(--part-color, #647b95); border: 1px solid #20365320; display: grid; place-items: center; }
 .swatch::after { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 1px solid #fff8; }
 .part[data-part="seal"] .swatch::after { width: 11px; height: 9px; border: 2px solid #b4c5d9; transform: rotate(-20deg); }
-.part strong, .leak-step strong { display: block; font-size: 13px; line-height: 1.3; }
+.part strong, .leak-step strong, .pack-step strong { display: block; font-size: 13px; line-height: 1.3; }
 .part small { display: block; color: #5c7086; font-size: 11px; line-height: 1.35; margin-top: 3px; }
 .part-arrow { color: #4678b4; font-size: 18px; }
 .detail { margin-top: 17px; padding: 12px; border: 1px solid #d2e3f7; border-radius: 8px; background: #f1f7ff; }
@@ -118,10 +129,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 .detail button:hover { text-decoration: underline; }
 .detail.failure { border-color: #e9cea8; background: #fff8ec; }
 .detail.failure strong { color: #854907; }
-.leak-step { grid-template-columns: 25px 1fr; }
-.leak-step span { display: grid; place-items: center; width: 24px; height: 24px; background: #f0f4fa; color: #4f6680; border-radius: 50%; font: 11px "IBM Plex Mono", ui-monospace, monospace; }
+.leak-step, .pack-step { grid-template-columns: 25px 1fr; }
+.leak-step span, .pack-step span { display: grid; place-items: center; width: 24px; height: 24px; background: #f0f4fa; color: #4f6680; border-radius: 50%; font: 11px "IBM Plex Mono", ui-monospace, monospace; }
 .leak-step:hover, .leak-step[aria-pressed="true"] { border-color: #e3b878; background: #fff7e9; }
 .leak-step[aria-pressed="true"] span { background: #f7dfb9; color: #83460a; }
+.pack-step:hover, .pack-step[aria-pressed="true"] { border-color: #acd0ed; background: #eef7fd; }
+.pack-step[aria-pressed="true"] span { background: #d5eaf8; color: #175781; }
 .explainer { display: grid; grid-template-columns: 1fr 1fr; gap: 17px 34px; padding: 24px 0 18px; }
 .explainer h2 { font-size: 15px; margin: 0 0 6px; }
 .explainer p, .source { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0; }
@@ -148,6 +161,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
   .intro p { font-size: 13px; }
   .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 6px; }
   .tabs button { font-size: 12px; justify-content: center; padding: 7px 3px; }
+  .tabs button[data-mode="pack"] { grid-column: 1 / -1; }
   .stage { height: clamp(335px, 86vw, 430px); min-height: 335px; }
   .stage-title { top: 9px; left: 10px; }
   .stage-title strong { font-size: 11px; }
@@ -155,9 +169,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
   .viewer-footer { min-height: 51px; padding: 7px 8px; }
   .explode-control { gap: 6px; font-size: 12px; }
   .gestures { font-size: 10px; gap: 6px; }
-  .leak-control { gap: 5px; font-size: 11px; }
-  .leak-control:not([hidden]) + .gestures { display: none; }
-  #leak-progress { font-size: 11px; }
+  .leak-control, .pack-control { gap: 5px; font-size: 11px; }
+  .viewer-footer:has(.leak-control:not([hidden]), .pack-control:not([hidden])) .gestures { display: none; }
+  #leak-progress, #pack-progress { font-size: 11px; }
   .camera { right: 8px; bottom: 8px; }
   .camera button { width: 30px; height: 30px; }
   .sidebar { display: block; padding: 15px; }
@@ -185,11 +199,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
   <main>
     <div class="intro">
       <h1>电池芯密封圈</h1>
-      <p>拆开方形电芯的极柱总成，查看黑色密封圈的装配位置和失效后的渗漏路径。</p>
+      <p>从电池包里找到单颗电芯，再拆开极柱总成，查看黑色密封圈的位置和渗漏路径。</p>
     </div>
     <div class="workbench">
       <section class="viewer" aria-label="三维模型">
         <nav class="tabs" aria-label="模型视图">
+          <button type="button" data-mode="pack" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14v10H3zM6 3h8M8 8v6m4-6v6"/></svg>电池包与供电</button>
           <button type="button" data-mode="cell" aria-pressed="false"><i aria-hidden="true"></i>整颗电芯</button>
           <button type="button" data-mode="assembled" aria-pressed="false"><i aria-hidden="true"></i>装配位置</button>
           <button type="button" data-mode="exploded" aria-pressed="true"><i aria-hidden="true"></i>爆炸拆解</button>
@@ -200,8 +215,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
         <div class="stage" id="stage">
           <div class="stage-title"><strong id="scene-title">极柱总成爆炸图</strong></div>
           <canvas id="scene" tabindex="0" aria-label="交互式三维电芯。拖动或按方向键旋转，滚轮或加减键缩放。"></canvas>
+          <canvas id="pack-scene" tabindex="0" aria-label="交互式三维电池包。拖动或按方向键旋转，滚轮或加减键缩放。" hidden></canvas>
           <div id="annotations" aria-label="模型标注"></div>
           <div class="stage-key" id="stage-key" hidden><span></span>电解液示踪</div>
+          <div class="stage-key pack-key" id="pack-key" hidden><span></span><span id="pack-key-text"></span></div>
           <div class="camera" aria-label="镜头控制">
             <button type="button" id="zoom-in" title="放大" aria-label="放大">+</button>
             <button type="button" id="zoom-out" title="缩小" aria-label="缩小">−</button>
@@ -222,6 +239,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
             <button type="button" class="step-control" id="prev-phase" aria-label="上一个泄漏步骤">‹</button>
             <span id="leak-progress" aria-live="polite"></span>
             <button type="button" class="step-control" id="next-phase" aria-label="下一个泄漏步骤">›</button>
+          </div>
+          <div class="pack-control" id="pack-control" hidden>
+            <button class="play" id="play-pack" type="button">▶ 播放动画</button>
+            <button type="button" class="step-control" id="prev-pack" aria-label="上一个电池包步骤">‹</button>
+            <span id="pack-progress"></span>
+            <button type="button" class="step-control" id="next-pack" aria-label="下一个电池包步骤">›</button>
           </div>
           <p class="gestures" id="gestures"><span>拖动旋转</span><span>滚轮缩放</span></p>
         </div>
@@ -248,11 +271,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
     <footer class="source">
       <details>
         <summary>模型依据与参考资料</summary>
-        <p>黑色密封圈的宽法兰、上凸缘和通孔参考来图。法兰外径按示意比例重建。极柱、盖板、壳体和内部零件采用通用结构示意。剖面中的间隙和动画时序经过放大与简化，供送样阶段沟通。</p>
+        <p>黑色密封圈的宽法兰、上凸缘和通孔参考来图。法兰外径按示意比例重建。电池包的排布、串联回路和电芯内部采用通用结构示意。剖面中的间隙和动画时序经过放大与简化，供送样阶段沟通。</p>
         <ul>
           <li><a href="https://data.epo.org/publication-server/rest/v1.2/publication-dates/2025-10-22/patents/EP4636914NWA2/document.pdf" target="_blank" rel="noopener noreferrer">极柱密封界面示例 · 欧洲专利局</a></li>
           <li><a href="https://advanced.onlinelibrary.wiley.com/doi/10.1002/advs.202405897" target="_blank" rel="noopener noreferrer">电解液用量对电芯老化的影响 · Advanced Science</a></li>
           <li><a href="https://www.nhtsa.gov/sites/nhtsa.gov/files/documents/12848-lithiumionsafetyhybrids_101217-v3-tag.pdf" target="_blank" rel="noopener noreferrer">电动车用锂离子电池安全 · NHTSA</a></li>
+          <li><a href="https://www.energy.gov/science/doe-explainsbatteries" target="_blank" rel="noopener noreferrer">电池如何储存并释放能量 · 美国能源部</a></li>
+          <li><a href="https://www.catl.com/en/news/472.html" target="_blank" rel="noopener noreferrer">电芯直接集成到电池包的示例 · 宁德时代</a></li>
         </ul>
       </details>
     </footer>
@@ -1151,6 +1176,613 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 (() => {
   "use strict";
 
+  const TAU = Math.PI * 2;
+  const COLORS = {
+    tray: [111, 137, 158],
+    frame: [84, 109, 132],
+    floor: [140, 165, 183],
+    metal: [166, 186, 200],
+    edge: [36, 61, 84],
+    lid: [173, 195, 216],
+    ribs: [193, 213, 230],
+    module: [92, 128, 153],
+    selectedModule: [58, 127, 200],
+    cell: [160, 180, 193],
+    cellTop: [193, 207, 218],
+    selectedCell: [207, 134, 65],
+    selectedTop: [240, 179, 104],
+    terminal: [209, 223, 232],
+    pad: [48, 65, 82],
+    bus: [160, 116, 71],
+    liveBus: [229, 160, 72],
+    load: [59, 93, 113],
+    loadTop: [154, 192, 209]
+  };
+
+  const modulePositions = [
+    { x: 4.87, z: -2.74, direction: -1 },
+    { x: -4.87, z: -2.74, direction: -1 },
+    { x: -4.87, z: 2.74, direction: 1 },
+    { x: 4.87, z: 2.74, direction: 1 },
+  ];
+  const highlighted = 3;
+  const highlightedCell = 7;
+  const cellCount = 8;
+  const terminalSpacing = 1.57;
+  const cellPitch = 1.04;
+  const clamp = (t, a = 0, b = 1) => Math.min(b, Math.max(a, t));
+  const smooth = t => t * t * (3 - 2 * t);
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const interpolate = (a, b, t) => a.map((value, i) => value + (b[i] - value) * t);
+  const cameraDefault = { yaw: .52, pitch: .60 };
+
+  function poseFor(step, progress) {
+    const t = smooth(progress);
+    if (step === 0) return { cover: t, module: 0, cell: 0, electric: 0 };
+    if (step === 1) return { cover: 1, module: t, cell: 0, electric: 0 };
+    if (step === 2) return { cover: 1, module: 1, cell: t, electric: 0 };
+    return {
+      cover: 1,
+      cell: 1 - smooth(clamp(progress / .37)),
+      module: 1 - smooth(clamp((progress - .23) / .43)),
+      electric: smooth(clamp((progress - .66) / .34)),
+    };
+  }
+
+  function makeCamera(width, height, yaw, pitch, zoom, electric) {
+    const span = 29.4 + electric * 6.5;
+    const scale = zoom * Math.min(width / span, height / 17.7);
+    const up = [-Math.sin(yaw) * Math.sin(pitch), Math.cos(pitch), -Math.cos(yaw) * Math.sin(pitch)];
+    const screenRight = [Math.cos(yaw), 0, -Math.sin(yaw)];
+    const forward = [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)];
+    const center = [electric * 2.9, 2.85 - electric * .75, -.55];
+    const cx = width * .50 - dot(center, screenRight) * scale;
+    const cy = height * .535 + dot(center, up) * scale;
+    return {
+      forward,
+      scale,
+      project(point) {
+        return {
+          x: cx + dot(point, screenRight) * scale,
+          y: cy - dot(point, up) * scale,
+          depth: dot(point, forward),
+        };
+      },
+    };
+  }
+
+  function mixColor(color, brightness) {
+    const rgb = color.map(value => Math.round(clamp(value * brightness, 0, 255)));
+    return "rgb(" + rgb.join(",") + ")";
+  }
+
+  function drawQueue(context, queue) {
+    queue.sort((a, b) => a.depth - b.depth);
+    for (const item of queue) {
+      context.globalAlpha = item.alpha;
+      context.beginPath();
+      context.moveTo(item.points[0].x, item.points[0].y);
+      for (const point of item.points.slice(1)) context.lineTo(point.x, point.y);
+      if (item.fill) {
+        context.closePath();
+        context.fillStyle = item.fill;
+        context.fill();
+      }
+      if (item.stroke) {
+        context.strokeStyle = item.stroke;
+        context.lineWidth = item.width;
+        context.stroke();
+      }
+    }
+    context.globalAlpha = 1;
+  }
+
+  function createRenderer(camera, context) {
+    const queue = [];
+    const light = [-.26, .88, .39];
+
+    function face(points, normal, color, alpha = 1, seam = false) {
+      if (dot(normal, camera.forward) <= 0 || alpha <= 0) return;
+      const projected = points.map(camera.project);
+      const shade = .70 + .31 * Math.max(0, dot(normal, light)) + .13 * Math.max(0, normal[1]);
+      queue.push({
+        points: projected,
+        depth: projected.reduce((result, point) => result + point.depth, 0) / projected.length,
+        fill: mixColor(color, shade),
+        stroke: mixColor(color, shade * (seam ? 1 : .83)),
+        width: seam ? .65 : .44, alpha,
+      });
+    }
+
+    function roundBox(x, y, z, width, height, depth, color, cut = .10, alpha = 1, tilt = 0) {
+      const w = width / 2;
+      const d = depth / 2;
+      const c = Math.min(cut, w * .48, d * .48);
+      const outline = [
+        [-w + c, -d], [w - c, -d], [w, -d + c], [w, d - c],
+        [w - c, d], [-w + c, d], [-w, d - c], [-w, -d + c],
+      ];
+      const cos = Math.cos(tilt);
+      const sin = Math.sin(tilt);
+      const transform = (a, b, q) => [x + a, y + b * cos - q * sin, z + b * sin + q * cos];
+      const top = outline.map(([a, q]) => transform(a, height / 2, q));
+      const bottom = outline.map(([a, q]) => transform(a, -height / 2, q));
+      const upper = [0, cos, sin];
+      const lower = [0, -cos, -sin];
+      if (width > 10 && depth > 7) {
+        const [heightSign, normal] = dot(upper, camera.forward) > 0 ? [1, upper] : [-1, lower];
+        const nx = Math.ceil(width / 1.41);
+        const nz = Math.ceil(depth / 1.41);
+        for (let i = 0; i < nx; i++) {
+          const a = -w + i * width / nx;
+          const b = i === nx - 1 ? w : -w + (i + 1) * width / nx;
+          for (let j = 0; j < nz; j++) {
+            const q = -d + j * depth / nz;
+            const r = j === nz - 1 ? d : -d + (j + 1) * depth / nz;
+            const corners = [[a, q], [b, q], [b, r], [a, r]];
+            const tile = corners.flatMap((point, index) => {
+              const [u, v] = point;
+              if (Math.abs(u) !== w || Math.abs(v) !== d) return [point];
+              const previous = corners[(index + 3) % 4];
+              const alongX = [u - Math.sign(u) * c, v];
+              const alongZ = [u, v - Math.sign(v) * c];
+              return previous[0] === u ? [alongZ, alongX] : [alongX, alongZ];
+            });
+            face(tile.map(([u, v]) => transform(u, heightSign * height / 2, v)), normal, color, alpha, true);
+          }
+        }
+      } else {
+        face(top, upper, color, alpha);
+        face(bottom, lower, color, alpha);
+      }
+      for (let i = 0; i < outline.length; i++) {
+        const j = (i + 1) % outline.length;
+        const dx = outline[j][0] - outline[i][0];
+        const dz = outline[j][1] - outline[i][1];
+        const distance = Math.hypot(dx, dz);
+        face([bottom[i], bottom[j], top[j], top[i]], [dz / distance, dx / distance * sin, -dx / distance * cos], color, alpha);
+      }
+    }
+
+    function disk(x, y, z, radius, height, color, alpha = 1, sides = 12) {
+      const top = [];
+      const bottom = [];
+      for (let i = 0; i < sides; i++) {
+        const angle = i / sides * TAU;
+        const dx = Math.cos(angle) * radius;
+        const dz = Math.sin(angle) * radius;
+        top.push([x + dx, y + height / 2, z + dz]);
+        bottom.push([x + dx, y - height / 2, z + dz]);
+      }
+      face(top, [0, 1, 0], color, alpha);
+      for (let i = 0; i < sides; i++) {
+        const j = (i + 1) % sides;
+        const angle = (i + .5) / sides * TAU;
+        face([bottom[i], bottom[j], top[j], top[i]], [Math.cos(angle), 0, Math.sin(angle)], color, alpha);
+      }
+    }
+
+    function line(points, stroke, width, alpha = 1, shiftDepth = 0) {
+      if (alpha <= 0) return;
+      const projected = points.map(camera.project);
+      for (let i = 1; i < projected.length; i++) {
+        const a = projected[i - 1];
+        const b = projected[i];
+        queue.push({ points: [a, b], depth: (a.depth + b.depth) / 2 + shiftDepth, stroke, width, alpha });
+      }
+    }
+
+    return {
+      box: roundBox,
+      disk,
+      line,
+      flush: () => drawQueue(context, queue),
+    };
+  }
+
+  function insideModule(position, index, vertical = 0, shift = 0, enlarged = 1) {
+    const x = position.x + position.direction * (index - (cellCount - 1) / 2) * cellPitch + shift;
+    const z = position.z + shift * .53;
+    const top = .37 + vertical + 1.70 * enlarged;
+    const sign = index % 2 === 0 ? -1 : 1;
+    return {
+      x, z, top,
+      negative: [x, top + .17 * enlarged, z - sign * terminalSpacing * enlarged],
+      positive: [x, top + .17 * enlarged, z + sign * terminalSpacing * enlarged],
+    };
+  }
+
+  function addTray(renderer) {
+    const { box, disk } = renderer;
+    box(0, -.37, 0, 21.65, .55, 12.25, COLORS.tray, .64);
+    box(0, -.04, 0, 20.8, .20, 11.8, COLORS.floor, .42);
+    for (const sign of [-1, 1]) {
+      box(0, .46, sign * 5.86, 20.76, .88, .48, COLORS.frame, .21);
+      box(sign * 10.43, .47, 0, .52, .90, 11.67, COLORS.frame, .16);
+      box(0, .94, sign * 5.87, 20.74, .12, .42, COLORS.metal, .14);
+      box(sign * 10.42, .94, 0, .42, .12, 11.59, COLORS.metal, .12);
+      for (const x of [-8.75, -4.35, 4.35, 8.75]) {
+        box(x, -.12, sign * 6.19, .92, .22, 1.04, COLORS.tray, .16);
+        disk(x, .01, sign * 6.43, .14, .025, COLORS.edge, 1, 10);
+      }
+      for (const z of [-3.78, 3.78]) {
+        box(sign * 10.80, -.11, z, .89, .18, .80, COLORS.tray, .15);
+        disk(sign * 11.03, .01, z, .13, .023, COLORS.edge, 1, 10);
+      }
+    }
+    box(0, .18, 0, .27, .36, 11.5, COLORS.frame, .083);
+    box(0, .19, 0, 20.35, .38, .31, COLORS.frame, .11);
+  }
+
+  function addCover(renderer, amount, electric) {
+    if (electric > .96) return;
+    const { box } = renderer;
+    const y = 2.46 + amount * 3.32;
+    const z = -amount * 4.53;
+    const tilt = -.23 * amount;
+    const alpha = 1 - electric;
+    box(0, y, z, 21.30, .36, 12.07, COLORS.lid, .63, alpha, tilt);
+    box(0, y + .20, z + .05, 20.25, .09, 11.12, COLORS.ribs, .52, alpha, tilt);
+    for (const offset of [-3.54, 0, 3.54]) {
+      box(0, y + .245 - offset * Math.sin(tilt), z + .052 + offset * Math.cos(tilt), 17.70, .10, .14, COLORS.lid, .055, alpha, tilt);
+    }
+    for (const x of [-9.40, 9.40]) {
+      box(x, y + .247, z + .026, .18, .09, 9.50, COLORS.lid, .05, alpha, tilt);
+    }
+  }
+
+  function addModule(renderer, position, moduleIndex, pose, step) {
+    const { box, disk, line } = renderer;
+    const chosen = moduleIndex === highlighted;
+    const bright = chosen && (step > 0 || pose.cover > .60);
+    const lift = chosen ? 3.68 * pose.module : 0;
+    const moduleZ = position.z + (chosen ? .62 * pose.module : 0);
+    const moduleX = position.x + (chosen ? .22 * pose.module : 0);
+    const frame = bright ? COLORS.selectedModule : COLORS.module;
+    box(moduleX, .22 + lift, moduleZ, 8.82, .35, 5.12, frame, .18);
+    for (const z of [-2.42, 2.42]) {
+      box(moduleX, .45 + lift, moduleZ + z, 8.79, .27, .17, frame, .07);
+    }
+    for (const x of [-4.33, 4.33]) {
+      box(moduleX + x, 1 + lift, moduleZ, .19, 1.42, 5.01, frame, .07);
+    }
+
+    const units = [];
+    for (let index = 0; index < cellCount; index++) {
+      const focus = bright && index === highlightedCell;
+      const individual = focus ? pose.cell : 0;
+      const size = 1 + individual * .34;
+      const elevation = lift + 2.48 * individual;
+      const cell = insideModule({ ...position, x: moduleX, z: moduleZ }, index, elevation, individual * 2.80, size);
+      const casing = focus && step >= 2 ? COLORS.selectedCell : COLORS.cell;
+      const cap = focus && step >= 2 ? COLORS.selectedTop : COLORS.cellTop;
+      box(cell.x, .37 + elevation + .78 * size, cell.z, .91 * size, 1.56 * size, 4.57 * size, casing, .08);
+      box(cell.x, cell.top - .09 * size, cell.z, .91 * size, .18 * size, 4.56 * size, cap, .073);
+      disk(cell.x, cell.top + .025 * size, cell.z, .19 * size, .038, COLORS.module, 1, 10);
+      for (const [x, y, z] of [cell.negative, cell.positive]) {
+        disk(x, y - .13 * size, z, .26 * size, .09 * size, COLORS.pad);
+        disk(x, y - .048 * size, z, .16 * size, .10 * size, COLORS.terminal);
+      }
+      units.push(cell);
+    }
+    for (let index = 0; index < units.length - 1; index++) {
+      if (chosen && index + 1 === highlightedCell && pose.cell > .04) continue;
+      const [x1, y, z] = units[index].positive;
+      const [x2] = units[index + 1].negative;
+      const color = pose.electric > .5 ? COLORS.liveBus : COLORS.bus;
+      box((x1 + x2) / 2, y + .008, z, Math.abs(x1 - x2) + .24, .042, .27, color, .048);
+    }
+    if (chosen && pose.module > .06) {
+      const guideColor = "#609bd1";
+      for (const x of [-4.23, 4.12]) {
+        for (let tick = .15; tick < lift - .2; tick += .32) {
+          const A = [position.x + x + .22 * tick / 3.68, tick, position.z + 2.39 + .62 * tick / 3.68];
+          line([A, [A[0] + .01, tick + .15, A[2] + .02]], guideColor, 1, .58);
+        }
+      }
+    }
+    if (chosen && pose.cell > .05) {
+      const cell = units[highlightedCell];
+      const base = insideModule({ ...position, x: moduleX, z: moduleZ }, highlightedCell, lift);
+      for (let tick = .04; tick < .95; tick += .145) {
+        const A = interpolate([base.x, base.top, base.z], [cell.x, cell.top, cell.z], tick);
+        const B = interpolate([base.x, base.top, base.z], [cell.x, cell.top, cell.z], tick + .073);
+        line([A, B], "#be874c", 1.15, .63);
+      }
+    }
+    return { x: moduleX, z: moduleZ, lift, units };
+  }
+
+  const loadShift = 1.45;
+  const externalRoute = [
+    [10.70, 1.28, 3.42], [12.22, 1.26, 3.42], [12.74, 1.26, 2.86],
+    [12.74, 1.36, 1.48], [13.63, 1.44, 1.48], [14.17, 1.44, 1.48],
+    [14.17, 1.45, .86], [14.46, 1.45, .62], [13.91, 1.45, .37],
+    [14.46, 1.45, .13], [13.91, 1.45, -.13], [14.46, 1.45, -.38],
+    [13.91, 1.45, -.62], [14.17, 1.45, -.86], [14.17, 1.44, -1.48], [13.63, 1.44, -1.48],
+    [12.74, 1.36, -1.48], [12.74, 1.26, -2.86], [12.22, 1.26, -3.42], [10.70, 1.28, -3.42],
+  ].map(([x, y, z]) => [x + Math.min(1, Math.max(0, (x - 10.7) / 2.9)) * loadShift, y, z]);
+  const externalLengths = externalRoute.slice(1).map((point, i) => Math.hypot(...point.map((value, j) => value - externalRoute[i][j])));
+  const totalLength = externalLengths.reduce((a, b) => a + b, 0);
+
+  function pointOnCircuit(fraction) {
+    let distance = totalLength * clamp(fraction);
+    for (let i = 0; i < externalLengths.length; i++) {
+      const length = externalLengths[i];
+      if (distance <= length) return interpolate(externalRoute[i], externalRoute[i + 1], distance / length);
+      distance -= length;
+    }
+    return externalRoute.at(-1);
+  }
+
+  function addElectricCircuit(renderer, groups, amount) {
+    if (amount <= 0) return;
+    const { box, disk, line } = renderer;
+    const powerWire = "#aa7544";
+    for (let i = 0; i < groups.length - 1; i++) {
+      const end = groups[i].units.at(-1).positive;
+      const start = groups[i + 1].units[0].negative;
+      const route = i === 1
+        ? [end, [-9.58, 2.44, end[2]], [-9.58, 2.44, start[2]], start]
+        : [end, [(end[0] + start[0]) / 2, 2.44, end[2]], [(end[0] + start[0]) / 2, 2.44, start[2]], start];
+      line(route, powerWire, 2.9, amount, 1.4);
+    }
+
+    box(14.17 + loadShift, .47, 0, 2.73, 1.09, 4.27, COLORS.load, .28, amount);
+    box(14.17 + loadShift, 1.04, 0, 2.59, .16, 4.08, COLORS.loadTop, .27, amount);
+    box(14.17 + loadShift, 1.18, 0, 1.29, .14, 2.24, COLORS.frame, .18, amount);
+    for (const z of [-1.48, 1.48]) {
+      disk(13.63 + loadShift, 1.27, z, .19, .11, COLORS.terminal, amount);
+    }
+
+    const positive = groups.at(-1).units.at(-1).positive;
+    const negative = groups[0].units[0].negative;
+    const endpoints = [externalRoute[0], externalRoute.at(-1)];
+    for (const [index, post] of [positive, negative].entries()) {
+      const endpoint = endpoints[index];
+      box(endpoint[0] - .25, .73, endpoint[2], .73, .72, .94, COLORS.edge, .10, amount);
+      disk(endpoint[0], 1.17, endpoint[2], .27, .19, COLORS.bus, amount);
+      line([post, [9.44, 2.41, post[2]], [9.75, 1.86, endpoint[2]], endpoint], powerWire, 3.1, amount, 1.4);
+    }
+
+    line(externalRoute, "#263d55", 5.2, amount * .88, 4);
+    line(externalRoute, "#45bad9", 2.5, amount, 4.1);
+  }
+
+  function drawPolarity(context, position, plus, alpha) {
+    context.save();
+    context.globalAlpha = alpha;
+    context.translate(position.x, position.y - 11);
+    context.beginPath();
+    context.arc(0, 0, 6.7, 0, TAU);
+    context.fillStyle = plus ? "#f8ede3" : "#e9f5fe";
+    context.fill();
+    context.strokeStyle = plus ? "#bc7841" : "#6084a8";
+    context.lineWidth = .85;
+    context.stroke();
+    context.beginPath();
+    context.moveTo(-3, 0);
+    context.lineTo(3, 0);
+    if (plus) {
+      context.moveTo(0, -3);
+      context.lineTo(0, 3);
+    }
+    context.stroke();
+    context.restore();
+  }
+
+  function drawArrow(context, camera, fraction, opacity) {
+    const point = camera.project(pointOnCircuit(fraction));
+    const ahead = camera.project(pointOnCircuit(Math.min(.999, fraction + .016)));
+    if (Math.hypot(ahead.x - point.x, ahead.y - point.y) < .1) return;
+    context.save();
+    context.translate(point.x, point.y);
+    context.rotate(Math.atan2(ahead.y - point.y, ahead.x - point.x));
+    context.globalAlpha = opacity;
+    context.fillStyle = "#f7feff";
+    context.strokeStyle = "#176386";
+    context.lineWidth = .8;
+    context.beginPath();
+    context.moveTo(4.0, 0);
+    context.lineTo(-3.9, -3.4);
+    context.lineTo(-2.0, 0);
+    context.lineTo(-3.9, 3.4);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.restore();
+  }
+
+  window.createPackScene = (canvas, options = {}) => {
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Pack scene requires Canvas 2D.");
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const pointers = new Map();
+    let step = 0;
+    let progress = 1;
+    let yaw = cameraDefault.yaw;
+    let pitch = cameraDefault.pitch;
+    let scale = 1;
+    let frameId = 0;
+    let autoRotate = false;
+    let flowAnimated = false;
+    let lastTime = 0;
+    let flowTime = 0;
+
+    function frame(time) {
+      frameId = 0;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (!width || !height) return;
+      const ratio = Math.min(2, window.devicePixelRatio || 1);
+      const pixelWidth = Math.round(width * ratio);
+      const pixelHeight = Math.round(height * ratio);
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+      }
+      const elapsed = lastTime ? Math.min(48, time - lastTime) : 0;
+      lastTime = time;
+      if (autoRotate) yaw += elapsed * .00045;
+      const moving = flowAnimated && !preference.matches;
+      if (moving) flowTime += elapsed;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      context.clearRect(0, 0, width, height);
+      context.lineJoin = "round";
+      context.lineCap = "round";
+
+      const pose = poseFor(step, progress);
+      const camera = makeCamera(width, height, yaw, pitch, scale, pose.electric);
+      const renderer = createRenderer(camera, context);
+      addTray(renderer);
+      addCover(renderer, pose.cover, pose.electric);
+      const groups = modulePositions.map((position, i) => addModule(renderer, position, i, pose, step));
+      if (step === 3) addElectricCircuit(renderer, groups, pose.electric);
+      renderer.flush();
+
+      const anchors = [];
+      function mark(id, world, visible) {
+        if (!visible) return;
+        const point = camera.project(world);
+        anchors.push({ id, x: point.x, y: point.y, visible: point.x > 3 && point.x < width - 3 && point.y > 3 && point.y < height - 3 });
+      }
+
+      const group = groups[highlighted];
+      const cell = group.units[highlightedCell];
+      mark("tray", [-4.05, .65, 6.0], true);
+      mark("cover", [-5.60, 2.64 + pose.cover * 3.32, -pose.cover * 4.53 - 1.42], step === 0 || (step < 3 && width > 520));
+      mark("module", [group.x - 2.37, .5 + group.lift, group.z + 2.50], step === 1 || (step === 0 && pose.cover > .78));
+      mark("cell", [cell.x, cell.top - .6, cell.z + 1.53], step === 2 && pose.cell > .30);
+      const [sealX, sealY, sealZ] = cell.positive;
+      mark("seal", [sealX, sealY - .1, sealZ + .11], step === 2 && pose.cell > .63);
+      const adjacent = group.units[highlightedCell - 1].positive;
+      mark("busbar", [adjacent[0] - .50, adjacent[1], adjacent[2]], step === 3 && pose.electric > .36);
+      mark("load", [14.19 + loadShift, 1.32, -.50], step === 3 && pose.electric > .38);
+      mark("positive", externalRoute[0], step === 3 && pose.electric > .38);
+      mark("negative", externalRoute.at(-1), step === 3 && pose.electric > .38);
+
+      if (pose.electric > .28) {
+        drawPolarity(context, camera.project(externalRoute[0]), true, pose.electric);
+        drawPolarity(context, camera.project(externalRoute.at(-1)), false, pose.electric);
+        const offset = (flowTime / 2750) % 1;
+        for (let i = 0; i < 5; i++) {
+          const position = moving ? (offset + i * .2) % 1 : .13 + i * .19;
+          if (position > .03 && position < .95) drawArrow(context, camera, position, pose.electric);
+        }
+      }
+      options.onFrame?.(anchors);
+      if (autoRotate || (pose.electric > .28 && moving)) invalidate();
+    }
+
+    function invalidate() {
+      if (!frameId) frameId = requestAnimationFrame(frame);
+    }
+
+    function reset() {
+      yaw = cameraDefault.yaw;
+      pitch = cameraDefault.pitch;
+      scale = 1;
+      invalidate();
+    }
+
+    function zoom(factor) {
+      if (Number.isFinite(factor) && factor > 0) scale = clamp(scale * factor, .58, 3.0);
+      invalidate();
+    }
+
+    function turn(deltaX, deltaY) {
+      yaw -= deltaX;
+      pitch = clamp(pitch + deltaY, .20, 1.36);
+      invalidate();
+    }
+
+    function pointerDown(event) {
+      if (event.button !== 0 && event.pointerType === "mouse") return;
+      pointers.set(event.pointerId, [event.clientX, event.clientY]);
+      canvas.setPointerCapture(event.pointerId);
+    }
+
+    function pointerMove(event) {
+      const before = pointers.get(event.pointerId);
+      if (!before) return;
+      const after = [event.clientX, event.clientY];
+      pointers.set(event.pointerId, after);
+      if (pointers.size === 2) {
+        const other = [...pointers].find(([id]) => id !== event.pointerId)[1];
+        const distance = point => Math.hypot(point[0] - other[0], point[1] - other[1]);
+        if (distance(before) > 1) zoom(distance(after) / distance(before));
+      } else {
+        turn((after[0] - before[0]) * .009, (after[1] - before[1]) * .008);
+      }
+    }
+
+    function pointerUp(event) {
+      pointers.delete(event.pointerId);
+    }
+
+    function wheel(event) {
+      event.preventDefault();
+      zoom(Math.exp(clamp(-event.deltaY * .002, -.27, .27)));
+    }
+
+    function keydown(event) {
+      const actions = {
+        ArrowLeft: () => turn(-.14, 0), ArrowRight: () => turn(.14, 0),
+        ArrowUp: () => turn(0, .11), ArrowDown: () => turn(0, -.11),
+        "+": () => zoom(1.14), "=": () => zoom(1.14), "-": () => zoom(.88), Home: reset,
+      };
+      if (!Object.hasOwn(actions, event.key)) return;
+      event.preventDefault();
+      actions[event.key]();
+    }
+
+    const events = {
+      pointerdown: pointerDown, pointermove: pointerMove, pointerup: pointerUp, pointercancel: pointerUp,
+      lostpointercapture: pointerUp, wheel, keydown,
+    };
+    for (const [name, handler] of Object.entries(events)) canvas.addEventListener(name, handler, { passive: false });
+    const resize = new ResizeObserver(invalidate);
+    resize.observe(canvas);
+    preference.addEventListener?.("change", invalidate);
+    invalidate();
+
+    return {
+      setStep(index) {
+        if (!Number.isInteger(index) || index < 0 || index > 3) return;
+        step = index;
+        progress = 1;
+        flowTime = 0;
+        invalidate();
+      },
+      setProgress(value) {
+        if (!Number.isFinite(value)) return;
+        progress = clamp(value);
+        invalidate();
+      },
+      reset,
+      zoom,
+      setAutoRotate(value) {
+        autoRotate = Boolean(value);
+        invalidate();
+      },
+      setFlowAnimated(value) {
+        flowAnimated = Boolean(value);
+        invalidate();
+      },
+      destroy() {
+        cancelAnimationFrame(frameId);
+        resize.disconnect();
+        preference.removeEventListener?.("change", invalidate);
+        for (const [name, handler] of Object.entries(events)) canvas.removeEventListener(name, handler);
+      },
+    };
+  };
+})();
+</script>
+<script>
+(() => {
+  "use strict";
+
   const el = id => document.getElementById(id);
   const modeButtons = [...document.querySelectorAll("[data-mode]")];
   const canvas = el("scene");
@@ -1192,10 +1824,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
   };
   const staticLabels = {
     gap: "局部间隙", leak: "渗出方向", residue: "外侧残留", interior: "浸润可能不足",
-    bore: "通孔", collar: "上凸缘"
+    bore: "通孔", collar: "上凸缘",
+    "pack-cover": "电池包上盖", "pack-tray": "包体托盘", "pack-module": "电池模组",
+    "pack-cell": "单颗电芯", "pack-seal": "极柱密封圈", "pack-busbar": "汇流排",
+    "pack-load": "外部负载", "pack-positive": "包总正极", "pack-negative": "包总负极"
   };
+  const leftAnnotations = new Set([
+    "lid", "shell", "collar", "interior", "pack-tray", "pack-negative", "pack-module", "pack-seal", "pack-busbar"
+  ]);
 
   const modes = {
+    pack: {
+      caption: "电池包内部", title: "电芯装在哪里，怎样供电",
+      summary: "播放动画，沿着电池包、模组、单颗电芯的层级往里看，再跟随放电电流经过外部负载。",
+      parts: [], labels: [], start: null
+    },
     cell: {
       caption: "方形电芯总览", title: "单颗电芯",
       summary: "先找顶盖两处极柱，再切换到装配位置观察其中一处密封区域。",
@@ -1247,13 +1890,48 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
     }
   ];
 
+  const packSteps = [
+    {
+      name: "打开电池包",
+      description: "电芯装在动力电池包的壳体里，位于上盖和底部托盘之间。打开上盖，可看到固定在包体内的多组电芯。",
+      key: "蓝色高亮为选中的模组",
+      labels: ["cover", "module", "tray"], duration: 2550
+    },
+    {
+      name: "提起一个模组",
+      description: "有模组的设计先把多颗电芯固定成一组，再把模组装入电池包。采用 CTP（电芯直接集成到包）等结构时，电芯可以直接装入包内。",
+      key: "蓝色高亮为选中的模组",
+      labels: ["module", "tray"], duration: 2800
+    },
+    {
+      name: "抽出单颗电芯",
+      description: "电芯是储能的基本单元。顶盖上的两个金属极柱把电芯接入电路。你们配套的黑色密封圈位于极柱穿过顶盖的位置，压紧后封住接口。",
+      key: "橙色高亮为选中的单颗电芯",
+      labels: ["cell", "seal", "module"], duration: 3350,
+      shortcut: {mode: "cell", label: "放大看单颗电芯"}
+    },
+    {
+      name: "装回并放电",
+      description: "充电时，电芯把输入的电能储为化学能。放电时，多颗电芯通过极柱和汇流排向外供电。蓝色箭头表示常规电流从总正极经过外部负载后回到总负极。动画以串联升压为例。",
+      key: "蓝色箭头表示放电电流",
+      labels: ["load", "busbar", "positive", "negative"], duration: 5500,
+      shortcut: {mode: "assembled", label: "查看极柱上的黑色密封圈"}
+    }
+  ];
+
   let scene;
+  let packScene;
   let mode = "exploded";
   let selection = null;
   let phase = 0;
   let playing = false;
   let leakTimer;
+  let packStep = 0;
+  let packProgress = 1;
+  let packPlaying = false;
+  let packFrame = 0;
   let toastTimer;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const annotationNodes = new Map();
 
   function addRadioButton(container, partId) {
@@ -1285,21 +1963,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
     const body = el("panel-body");
     const heading = document.createElement("span");
     heading.className = "panel-heading";
-    heading.textContent = mode === "leak" ? "选择演示步骤" : "点击部件查看";
+    const steps = mode === "pack" ? packSteps : mode === "leak" ? phases : null;
+    heading.textContent = steps ? "选择演示步骤" : "点击部件查看";
     const list = document.createElement("div");
     list.className = "part-list";
-    if (mode === "leak") {
-      phases.forEach((item, index) => {
+    if (steps) {
+      steps.forEach((item, index) => {
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "leak-step";
-        button.dataset.phase = index;
+        button.className = mode === "pack" ? "pack-step" : "leak-step";
+        button.dataset.step = index;
         const number = document.createElement("span");
         number.textContent = String(index + 1).padStart(2, "0");
         const label = document.createElement("strong");
         label.textContent = item.name;
         button.append(number, label);
         button.addEventListener("click", () => {
+          if (mode === "pack") {
+            choosePackStep(index);
+            return;
+          }
           stopLeakPlayback();
           setPhase(index);
         });
@@ -1362,9 +2045,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 
   function updateAnnotations(frame) {
     const labels = Array.isArray(frame) ? frame : Object.entries(frame || {}).map(([id, data]) => ({id, ...data}));
-    const allowed = modes[mode].labels;
+    const allowed = mode === "pack" ? packSteps[packStep].labels.map(id => "pack-" + id) : modes[mode].labels;
     const width = stage.clientWidth;
     const height = stage.clientHeight;
+    const rightClearance = mode === "pack" && width < 520 ? 71 : 114;
     const visible = new Set();
     const occupied = [];
     for (const {id, x, y, visible: show} of [...labels].sort((a, b) => allowed.indexOf(a.id) - allowed.indexOf(b.id))) {
@@ -1372,9 +2056,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
       if (mode === "leak" && ((phase === 3 && (id === "gap" || id === "leak")) || (phase === 2 && id === "gap"))) continue;
       if (y < 45 || y > height - 52 || x < 8 || x > width - 8) continue;
       const right = width - x;
-      const side = ["lid", "shell", "collar", "interior"].includes(id)
+      const side = leftAnnotations.has(id)
         ? (x > 110 ? "left" : "right")
-        : (right > 114 ? "right" : "left");
+        : (right > rightClearance ? "right" : "left");
       if (occupied.some(p => p.side === side && Math.abs(p.y - y) < 24 && Math.abs(p.x - x) < 120)) continue;
       const node = getAnnotation(id);
       node.hidden = false;
@@ -1398,7 +2082,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
     phase = index;
     scene?.setLeakPhase(index);
     for (const button of document.querySelectorAll(".leak-step")) {
-      button.setAttribute("aria-pressed", String(Number(button.dataset.phase) === index));
+      button.setAttribute("aria-pressed", String(Number(button.dataset.step) === index));
     }
     el("leak-progress").textContent = String(index + 1) + " / " + phases.length + " · " + phases[index].name;
     el("prev-phase").disabled = index === 0;
@@ -1428,9 +2112,74 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
     leakTimer = setTimeout(advance, 1750);
   }
 
+  function setPackStep(index, progress = 1) {
+    packStep = index;
+    packProgress = progress;
+    const item = packSteps[index];
+    packScene?.setStep(index);
+    packScene?.setProgress(progress);
+    for (const button of document.querySelectorAll(".pack-step")) {
+      button.setAttribute("aria-pressed", String(Number(button.dataset.step) === index));
+    }
+    el("pack-progress").textContent = String(index + 1) + " / " + packSteps.length + " · " + item.name;
+    el("prev-pack").disabled = index === 0;
+    el("next-pack").disabled = index === packSteps.length - 1;
+    el("pack-key").dataset.step = index;
+    el("pack-key-text").textContent = item.key;
+    renderDetail(item.name, item.description, item.shortcut);
+  }
+
+  function stopPackPlayback() {
+    cancelAnimationFrame(packFrame);
+    packFrame = 0;
+    packPlaying = false;
+    packScene?.setFlowAnimated(false);
+    el("play-pack").textContent = "▶ 播放动画";
+  }
+
+  function animatePackStep() {
+    const start = performance.now() - packProgress * packSteps[packStep].duration;
+    const duration = packSteps[packStep].duration;
+    const tick = now => {
+      packProgress = Math.min(1, Math.max(0, (now - start) / duration));
+      packScene?.setProgress(reduceMotion.matches ? 1 : packProgress);
+      if (packProgress < 1) {
+        packFrame = requestAnimationFrame(tick);
+      } else if (packStep < packSteps.length - 1) {
+        setPackStep(packStep + 1, 0);
+        animatePackStep();
+      } else {
+        stopPackPlayback();
+      }
+    };
+    packFrame = requestAnimationFrame(tick);
+  }
+
+  function choosePackStep(index) {
+    stopPackPlayback();
+    setPackStep(index);
+  }
+
+  function playPack() {
+    if (packPlaying) {
+      stopPackPlayback();
+      return;
+    }
+    if (packProgress === 1) setPackStep(0, 0);
+    packPlaying = true;
+    packScene?.setFlowAnimated(true);
+    el("play-pack").textContent = "Ⅱ 暂停";
+    animatePackStep();
+  }
+
+  function getActiveScene() {
+    return mode === "pack" ? packScene : scene;
+  }
+
   function setMode(nextMode, updateLocation = true) {
     if (!Object.hasOwn(modes, nextMode)) return;
     stopLeakPlayback();
+    stopPackPlayback();
     mode = nextMode;
     selection = null;
     const item = modes[mode];
@@ -1442,18 +2191,40 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
     el("panel-text").textContent = item.summary;
     el("explode-control").hidden = mode !== "exploded";
     el("leak-control").hidden = mode !== "leak";
+    el("pack-control").hidden = mode !== "pack";
     el("stage-key").hidden = true;
+    el("pack-key").hidden = mode !== "pack";
+    canvas.hidden = mode === "pack";
+    el("pack-scene").hidden = mode !== "pack";
 
     const rotate = el("rotate");
     rotate.setAttribute("aria-pressed", "false");
     scene?.setAutoRotate(false);
-    scene?.setMode(mode);
-    scene?.reset();
+    packScene?.setAutoRotate(false);
     renderList();
 
-    if (mode === "exploded") scene?.setExplode(Number(el("explode").value) / 100);
-    if (mode === "leak") setPhase(0);
-    else selectPart(item.start);
+    if (mode === "pack") {
+      if (!packScene) {
+        try {
+          packScene = window.createPackScene(el("pack-scene"), {
+            onFrame: labels => {
+              if (mode === "pack") updateAnnotations(labels.map(label => ({...label, id: "pack-" + label.id})));
+            }
+          });
+        } catch (error) {
+          console.error(error);
+        }
+      }
+      setPackStep(0);
+    } else {
+      packScene?.setStep(0);
+      scene?.setMode(mode);
+      if (mode === "exploded") scene?.setExplode(Number(el("explode").value) / 100);
+      if (mode === "leak") setPhase(0);
+      else selectPart(item.start);
+    }
+    getActiveScene()?.reset();
+    el("no-scene").hidden = Boolean(getActiveScene());
 
     if (updateLocation) {
       try { history.replaceState(null, "", "#" + mode); }
@@ -1495,7 +2266,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
 
   try {
     scene = window.createBatteryScene(canvas, {
-      onFrame: updateAnnotations,
+      onFrame: labels => { if (mode !== "pack") updateAnnotations(labels); },
       onPick: selectPart
     });
   } catch (error) {
@@ -1518,20 +2289,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, canvas:focus-visible
     el("explode-value").value = value + "%";
     scene?.setExplode(value / 100);
   });
-  el("zoom-in").addEventListener("click", () => scene?.zoom(1.18));
-  el("zoom-out").addEventListener("click", () => scene?.zoom(1 / 1.18));
+  el("zoom-in").addEventListener("click", () => getActiveScene()?.zoom(1.18));
+  el("zoom-out").addEventListener("click", () => getActiveScene()?.zoom(1 / 1.18));
   el("reset").addEventListener("click", () => {
-    scene?.setAutoRotate(false);
+    getActiveScene()?.setAutoRotate(false);
     el("rotate").setAttribute("aria-pressed", "false");
-    scene?.reset();
+    getActiveScene()?.reset();
   });
   el("rotate").addEventListener("click", event => {
     const active = event.currentTarget.getAttribute("aria-pressed") !== "true";
     event.currentTarget.setAttribute("aria-pressed", String(active));
-    scene?.setAutoRotate(active);
+    getActiveScene()?.setAutoRotate(active);
   });
   el("share").addEventListener("click", copyLink);
   el("play-leak").addEventListener("click", playLeak);
+  el("play-pack").addEventListener("click", playPack);
+  for (const [id, offset] of [["prev-pack", -1], ["next-pack", 1]]) {
+    el(id).addEventListener("click", () => choosePackStep(packStep + offset));
+  }
   for (const [id, offset] of [["prev-phase", -1], ["next-phase", 1]]) {
     el(id).addEventListener("click", () => {
       stopLeakPlayback();
