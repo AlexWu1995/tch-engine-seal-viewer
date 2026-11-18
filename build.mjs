@@ -10,3 +10,6 @@ console.log('Static viewer ready: '+html.length+' bytes');
 
 // Include the separate automotive viewer without changing the motorcycle entry.
 await import('./build-thermal.mjs');
+
+// Apply verified sealing studies to the existing business pages.
+await import('./build-updates.mjs');

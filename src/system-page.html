@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#153e55">
+  <meta name="description" content="可旋转、缩放和拆解的汽车密封件三维模型，逐部位查看密封件破损的机制、功能影响及表现。">
+  <title>__TITLE__ · 天诚密封应用三维图</title>
+  <!-- INLINE:system-viewer.css -->
+</head>
+<body data-system="__SYSTEM__">
+  <header class="app-header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">T</span><div>天诚 · 密封应用三维图<small>SEALING APPLICATION EXPLORER</small></div></div>
+    <nav aria-label="业务模块">
+      <a href="../">摩托车发动机</a><a href="../thermal/">汽车热管理</a><a href="../transmission/" data-nav="transmission">汽车变速器</a><a href="../chassis/" data-nav="chassis">汽车底盘</a>
+    </nav>
+  </header>
+  <main>
+    <div class="intro"><p class="eyebrow">__ENGLISH__ / 3D SEALING STUDY</p><h1>__TITLE__<span>密封件应用与功能失效</span></h1><p id="intro-text"></p></div>
+    <div class="workspace">
+      <section class="viewer" aria-label="交互式三维模型">
+        <div class="view-toolbar"><span class="view-caption">三维结构示意 <i></i> 彩色为密封部位</span><button type="button" id="reset">复位视角</button></div>
+        <div id="stage" class="stage"><canvas id="model" tabindex="0" aria-label="可交互三维模型，拖动或方向键旋转，滚轮或加减键缩放"></canvas><div id="markers"></div><div class="zoom-controls"><button id="zoom-in" type="button" aria-label="放大">＋</button><button id="zoom-out" type="button" aria-label="缩小">－</button></div><p id="model-status" role="status">正在准备模型…</p></div>
+        <div class="controls"><label>拆解程度 <output id="explode-value">20%</output><input id="explode" aria-label="拆解程度" type="range" min="0" max="100" value="20"></label><label>结构可见度 <output id="opacity-value">100%</output><input id="opacity" aria-label="结构可见度" type="range" min="8" max="100" value="100"></label></div>
+        <div class="view-actions"><button id="seals-only" type="button" aria-pressed="false">仅看密封件</button><button id="single" type="button" aria-pressed="false">单看所选密封</button><button id="rotate" type="button" aria-pressed="false">自动旋转</button><span>拖动旋转 · 滚轮 / 双指缩放</span></div>
+      </section>
+      <aside class="parts-panel" aria-labelledby="parts-title"><div class="panel-head"><p class="eyebrow">SEALING LOCATIONS</p><h2 id="parts-title">六个关键密封部位</h2><p>点击部位定位，并查看破损后果。</p></div><div id="seal-points"></div><label class="part-select-label" for="all-parts">逐件查看（含结构件）</label><select id="all-parts" aria-label="逐件选择模型零件"></select></aside>
+    </div>
+    <section class="failure-section" aria-live="polite" aria-labelledby="selected-title"><div class="selected-heading"><div><p id="selected-kind" class="eyebrow"></p><h2 id="selected-title"></h2></div><span class="failure-badge" id="failure-badge">密封件破损会怎样</span></div><p class="location" id="selected-location"></p><div class="failure-grid" id="failure-grid"></div><p class="evidence" id="selected-sources"></p><p class="scope-note">以下为通用失效链的工程说明。出现哪些后果取决于漏量、持续时间、工况及具体结构；模型的间距、比例和拆解方向经过简化。</p></section>
+    <section class="comparison"><div class="section-heading"><h2>各部位失效对照</h2><span>点击名称返回三维定位</span></div><div class="table-wrap"><table><thead><tr><th>密封部位</th><th>破损机制</th><th>功能影响</th><th>可观察表现</th></tr></thead><tbody id="failure-table"></tbody></table></div></section>
+    <details class="reference"><summary>查看应用位置参考图</summary><p>用户提供的应用位置参考。交互模型按通用结构重建，用于解释位置与机理，不是原厂 CAD。</p><img src="__REFERENCE__" alt="__TITLE__密封件应用位置参考图" loading="lazy" width="1280" height="720"></details>
+    <details class="reference"><summary>技术来源与适用范围</summary><ul id="source-list"></ul></details>
+    <footer><span>天诚 · 三维结构研究 / 2026.11.18</span><a id="download" download="__TITLE__-三维图与失效说明.html" href="./offline.html">下载可旋转离线版</a></footer>
+  </main>
+  <!-- INLINE:three.min.js -->
+  <!-- INLINE:transmission-model.js -->
+  <!-- INLINE:chassis-model.js -->
+  <!-- INLINE:failure-data.js -->
+  <!-- INLINE:system-viewer.js -->
+</body>
+</html>
